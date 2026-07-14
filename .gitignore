@@ -1,5 +1,39 @@
 *pro.user
 
+# Local-only development and privacy material
+.private/
+.agents/
+.codex/
+.venv/
+vendor-local/
+tools-local/
+.env
+.env.*
+!.env.example
+
+# Editors and local build configuration
+.idea/
+.vscode/*.local.*
+CMakeUserPresets.json
+
+# Local packages, diagnostics, captures, and symbols
+artifacts/
+packages/
+symbols/
+diagnostics/
+captures/
+logs/
+*.log
+*.dmp
+*.etl
+*.pcap
+*.pcapng
+*.pdb
+*.zip
+*.7z
+*.tar
+*.gz
+
 
 **/.vs/
 .vscode/
