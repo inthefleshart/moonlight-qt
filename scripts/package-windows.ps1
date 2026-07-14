@@ -21,3 +21,10 @@ New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 $destination = Join-Path $artifactDir ($source.BaseName.Replace('MoonlightPortable', 'MoonlightWacomPortable') + $source.Extension)
 Copy-Item -LiteralPath $source.FullName -Destination $destination -Force
 Get-FileHash -Algorithm SHA256 -LiteralPath $destination | Format-List
+
+$diagnosticExe = & (Join-Path $PSScriptRoot 'build-pen-diagnostics.ps1') -Configuration Release |
+    Select-Object -Last 1
+if (-not (Test-Path -LiteralPath $diagnosticExe)) { throw 'Pen diagnostic executable was not produced.' }
+$diagnosticDestination = Join-Path $artifactDir 'MoonlightPenDiagnostics.exe'
+Copy-Item -LiteralPath $diagnosticExe -Destination $diagnosticDestination -Force
+Get-FileHash -Algorithm SHA256 -LiteralPath $diagnosticDestination | Format-List

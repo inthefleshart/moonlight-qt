@@ -13,16 +13,16 @@ The feature is intended for creative applications that use Windows Ink, includin
 | --- | --- | --- |
 | Native `WM_POINTER` pen capture | Implemented | Windows-only; active while streaming to a host that advertises pen/touch support. |
 | Pressure, hover, eraser, barrel button, and tilt | Implemented | Forwarded through Moonlight's existing pen messages. |
-| Coalesced pen history | Implemented | Samples are processed in chronological order. |
+| Coalesced pen history | Implemented | Oversized batches are bounded to 32 transmitted samples while preserving state transitions and the newest position. |
 | Letterbox-aware coordinate mapping | Implemented | New contact outside the video area is ignored; active strokes are clamped. |
 | Stuck-state cleanup | Implemented | Pen state is cancelled on capture loss and stream teardown. |
 | Finger touch | Preserved | Uses Moonlight's existing SDL touch path with an added pen/touch policy. |
 | Duplicate SDL pen suppression | Implemented | Native pen input is authoritative when enabled; finger touch and real mouse input remain enabled. |
-| QuickKey remapping | Implemented | Configure tablet buttons as F13–F24, then optionally remap them in Moonlight. |
-| QuickKey profiles | Implemented | Independent Default, Krita, Photoshop, and Substance 3D Painter mapping containers. |
-| Aggregate diagnostics | Implemented | Optional sample and dropped-event counts; detailed live diagnostics are not yet implemented. |
-| Automated Windows-input tests | Passing | Covers the current geometry and tilt-conversion components. |
-| Debug and Release Windows builds | Passing | Portable packaging has also been exercised locally. |
+| QuickKey remapping | Implemented | Eighteen learnable source controls support recorded shortcuts, ordered key sequences, local actions, and held pen-drag gestures. |
+| QuickKey profiles | Implemented | Shipped artist presets cover major painting, sculpting, DCC, and remote-Windows workflows. |
+| Diagnostics | Implemented | Aggregate in-client counters plus a separate memory-only host pressure graph and drawing canvas. |
+| Automated Windows-input tests | Passing | Covers geometry, tilt, bounded history selection, transition preservation, and the 18-control preset catalog. |
+| Debug and Release Windows builds | Passing | Full application targets compile, deploy, and produce portable ZIPs locally. |
 | Physical tablet and application validation | Pending | Pressure, touch, tilt, and corner accuracy still require real-device testing. |
 | Wintab control discovery | Not implemented | No Wacom SDK files or `Wintab32.dll` are bundled. |
 | Public binary release | Not available | Build from source. Do not download binaries offered by unrelated third parties. |
@@ -62,24 +62,25 @@ The Input Settings page provides three policies:
 - **Disable touch while pen is in range** — prevents new finger contacts while the pen is detected near the display. Use this if palm touches reach the host unexpectedly.
 - **Always forward touch** — forwards the existing Moonlight touch path even while the pen is in range.
 
-### QuickKey profiles
+### QuickKey profiles and pen gestures
 
 The public, driver-independent control path uses keyboard chords:
 
-1. Configure the tablet's physical buttons in its HP/Wacom control panel as F13 through F24.
-2. Moonlight receives those keys through its normal keyboard input path.
-3. Each slot may pass through unchanged or be remapped to one shortcut.
+1. Keep existing controls assigned to F13 through F24 or use **Learn source** for another unique chord.
+2. Select one of the shipped 18-control profiles.
+3. Record a destination shortcut, ordered sequence, local action, or pen-drag gesture.
+4. Use **Reset** to restore one shipped row or reset the complete profile.
 
 Profiles are available for:
 
-- Default
-- Krita
-- Photoshop
-- Substance 3D Painter
+- Krita, Photoshop, and Substance 3D Painter
+- ZBrush, Mudbox, Mari, Daz Studio, and 3DCoat
+- Maya, 3ds Max, Blender, and Marmoset Toolbag
+- Windows 10/11 Remote, Maya-style navigation, 3ds Max-style navigation, sculpting, and texture-painting templates
 
-Profiles are independent mapping containers; they do not currently contain opinionated application presets. Empty slots pass F13–F24 through to the host unchanged.
+The first 12 sources remain F13–F24 for compatibility; sources 13–18 are learned explicitly. Presets are copied into editable working profiles and updates never overwrite customized rows. Modifier-only holds are supported. Pen gestures can hold keyboard modifiers and left, middle, right, X1, or X2 mouse while the pen supplies absolute movement, enabling actions such as Alt+Middle Mouse+Pen Drag.
 
-Supported remap targets include letters, numbers, F1–F24, arrow and navigation keys, Space, Tab, Enter, Escape, Backspace, Insert, and Delete. Ctrl, Alt, Shift, and Meta/Windows modifiers are supported. Multi-step key sequences and arbitrary text macros are not supported.
+Arbitrary text, shell commands, scripts, executable paths, and application launching are intentionally unsupported.
 
 ## Requirements
 
@@ -204,7 +205,9 @@ pwsh -File .\scripts\build-windows.ps1 -Configuration Release
 pwsh -File .\scripts\package-windows.ps1 -Configuration Release -SkipBuild
 ```
 
-The packaging command prints the SHA-256 checksum. The portable ZIP is named `MoonlightWacomPortable-x64-<version>.zip`.
+The packaging command prints SHA-256 checksums for `MoonlightWacomPortable-x64-<version>.zip` and the separate `MoonlightPenDiagnostics.exe` host utility.
+
+Portable builds skip the WiX/MSI restore by default. Add `-BuildInstaller` only when an MSI is explicitly required and WiX 7/NuGet have been configured. Use `-Clean` for a from-scratch build; without it, the wrapper resumes incrementally.
 
 For a Debug build:
 
@@ -256,19 +259,20 @@ Start with **Windows default**. Select **Disable touch while pen is in range** o
 
 ### Enable privacy-safe pen diagnostics
 
-When enabled, the current implementation reports aggregate native-pen sample and dropped-event counts at session teardown. It does not record typed keys, application titles, network addresses, file paths, or device serial numbers.
+When enabled, Moonlight reports aggregate native-pen sample, history-depth, retained/truncated sample, duplicate-suppression, and processing-time counters. It does not record typed keys, application titles, network addresses, file paths, or device serial numbers.
 
-This setting does not yet provide the detailed live diagnostics panel described in the long-term design. Leave it off during normal use.
+For a visual pressure graph and drawable test canvas, run the separately packaged `MoonlightPenDiagnostics.exe` on the host before connecting. It stores no logs and exposes an explicit clear/reset button. Leave diagnostics off during normal use.
 
 ### Tablet QuickKeys
 
-1. In the tablet manufacturer control panel, assign the first physical key to F13, the second to F14, and continue through F24.
-2. In Moonlight, choose a profile.
-3. Leave a field empty to pass its F-key through unchanged.
-4. Enter one shortcut such as `Ctrl+Z`, `Shift+F5`, or `B` to remap it.
-5. Move focus away from the field to save it.
-6. Resolve the orange warning if two slots use the same destination shortcut.
-7. Use **Reset QuickKey profile** to clear every remap in the selected profile.
+1. In the tablet manufacturer control panel, assign unique, otherwise-unused source chords. F13 through F24 are recommended for the first twelve controls.
+2. Open **Settings > Windows Pen, Touch, and QuickKeys** and select an application or generic profile. All 18 rows update immediately.
+3. Click **Learn source**, then press and release the physical control to associate it with a row.
+4. Click **Record shortcut** and press the desired keyboard chord. Modifier-only holds such as Shift and Ctrl are valid. `Esc` cancels and `Backspace` clears.
+5. Use **Sequence** for ordered key presses such as ZBrush brush selectors.
+6. Use **Pen gesture** for held navigation such as Alt + Middle Mouse + Pen Drag, B + Pen Drag, or F + Pen Drag.
+7. Use **Common action** for touch forwarding, diagnostics, Windows shortcuts, reset-stuck-input, or the Wacom Radial Menu chord template.
+8. Use **Reset** for one row or **Reset profile** for all 18 shipped rows. Customized rows are preserved until explicitly reset.
 
 Mappings are stored in the portable build's local settings. A profile is selected manually; profiles do not automatically follow the active remote application.
 
@@ -360,11 +364,11 @@ Keep additional USB pen tablets unplugged during the first integrated-display te
 
 ### QuickKeys do nothing
 
-- Confirm each hardware key emits its assigned F13–F24 key locally.
+- Confirm each hardware key emits a unique source chord locally.
 - Ensure the required profile is selected in Moonlight.
-- Leave the slot empty and verify the original F-key reaches the host.
-- Check that the destination shortcut uses a supported key.
-- Resolve duplicate shortcut warnings.
+- Use **Learn source** again and confirm the row displays the expected source.
+- Temporarily select **Pass through** to verify the original source reaches the host.
+- Resolve duplicate source or destination warnings shown by the editor.
 - Remember that application profiles are selected manually.
 
 ### Input remains held after a disconnect
@@ -379,9 +383,9 @@ Keep additional USB pen tablets unplugged during the first integrated-display te
 - Physical acceptance testing on the target tablet and host is still pending.
 - Krita, Photoshop, and Substance 3D Painter have not yet been certified on physical hardware with this branch.
 - The current tests do not prove the two-streamed-pixel corner-accuracy target.
-- Detailed live diagnostics, sanitized report export, control highlighting, and detected-device lists are not implemented.
-- QuickKey profiles contain user mappings only; no default application shortcut set is supplied.
-- QuickKey capture depends on the tablet driver being able to emit F13–F24.
+- A detailed live in-client graph and sanitized report export are not implemented; the separate host diagnostic utility provides a memory-only pressure graph and canvas.
+- QuickKey capture depends on the tablet driver exposing a keyboard chord or control event that Moonlight can receive.
+- Repeat actions and arbitrary delayed mouse/key macro editing are not exposed in the current recorder; shipped presets use chords, ordered key sequences, local actions, and hold-driven pen gestures.
 - Automatic application-profile switching is not implemented.
 - Wintab Tablet Controls discovery, ownership, rings, strips, and ExpressKey fallback are not implemented.
 - `-EnableLocalWintab` currently validates a local SDK path but does not compile a Wintab bridge.
