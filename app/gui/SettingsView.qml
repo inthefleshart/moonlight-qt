@@ -1545,21 +1545,47 @@ Flickable {
                 Label {
                     width: parent.width
                     wrapMode: Text.WordWrap
-                    text: qsTr("Tablet QuickKeys: the first 12 source controls remain F13 through F24 for compatibility. Learn the remaining controls, choose a shipped preset, or record a shortcut or pen-drag gesture. No shortcut syntax needs to be typed.")
+                    text: qsTr("HP ZBook QuickKeys: the ten physical controls default to F1 through F10. Choose any shipped preset below, then record a shortcut, sequence, common action, or pen-drag gesture. No shortcut syntax needs to be typed.")
                 }
 
-                AutoResizingComboBox {
-                    id: tabletProfileCombo
-                    textRole: "modelData"
-                    model: TabletMappingManager.profiles
-                    Component.onCompleted: currentIndex = Math.max(0, TabletMappingManager.profiles.indexOf(TabletMappingManager.activeProfile))
-                    onActivated: TabletMappingManager.activeProfile = TabletMappingManager.profiles[currentIndex]
+                RowLayout {
+                    width: parent.width
+                    Button {
+                        text: qsTr("Choose preset…")
+                        onClicked: profilePicker.open()
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        text: qsTr("Current preset: %1").arg(TabletMappingManager.activeProfile)
+                        font.bold: true
+                        elide: Text.ElideRight
+                    }
                 }
 
-                Connections {
-                    target: TabletMappingManager
-                    function onActiveProfileChanged() {
-                        tabletProfileCombo.currentIndex = Math.max(0, TabletMappingManager.profiles.indexOf(TabletMappingManager.activeProfile))
+                Popup {
+                    id: profilePicker
+                    modal: true
+                    focus: true
+                    width: Math.min(440, settingsPage.width - 40)
+                    height: Math.min(540, settingsPage.height - 40)
+                    anchors.centerIn: Overlay.overlay
+                    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+                    contentItem: ListView {
+                        id: profileList
+                        clip: true
+                        model: TabletMappingManager.profiles
+                        currentIndex: TabletMappingManager.profiles.indexOf(TabletMappingManager.activeProfile)
+                        delegate: ItemDelegate {
+                            width: profileList.width
+                            text: modelData
+                            highlighted: modelData === TabletMappingManager.activeProfile
+                            onClicked: {
+                                TabletMappingManager.activeProfile = modelData
+                                profilePicker.close()
+                            }
+                        }
+                        ScrollIndicator.vertical: ScrollIndicator { }
                     }
                 }
 
@@ -1570,6 +1596,7 @@ Flickable {
                         width: inputSettingsGroupBox.width - 30
 
                         Row {
+                            width: parent.width
                             spacing: 8
                             Label {
                                 width: 105
@@ -1588,7 +1615,7 @@ Flickable {
                                 ToolTip.text: qsTr("Press the physical QuickKey's unique keyboard chord. Escape cancels; Backspace clears the learned source.")
                             }
                             Label {
-                                width: parent.width - 330
+                                width: Math.max(120, parent.width - 330)
                                 text: actionText + (setupRequired ? qsTr(" (setup required)") : "")
                                 color: setupRequired ? "orange" : palette.text
                                 elide: Text.ElideRight
@@ -1596,9 +1623,11 @@ Flickable {
                             }
                         }
 
-                        Row {
+                        Flow {
+                            x: 105
+                            width: parent.width - x
+                            height: childrenRect.height
                             spacing: 6
-                            Item { width: 105; height: 1 }
                             Button {
                                 text: qsTr("Record shortcut")
                                 onClicked: {
@@ -1634,7 +1663,6 @@ Flickable {
                                 visible: userModified
                                 text: qsTr("Custom")
                                 color: "orange"
-                                anchors.verticalCenter: parent.verticalCenter
                             }
                         }
 

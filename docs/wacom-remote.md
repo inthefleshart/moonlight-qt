@@ -15,7 +15,7 @@ Restart an active stream after changing native-pen settings.
 
 ## QuickKey setup
 
-The first 12 logical sources remain F13 through F24 for compatibility. QuickKeys 13–18 begin without a source:
+The HP ZBook exposes ten programmable physical controls. Their default sources are F1 through F10:
 
 1. Configure each physical tablet control to emit a unique keyboard key or chord.
 2. Select a shipped profile in Moonlight.
@@ -27,7 +27,7 @@ The shortcut recorder requires no typed syntax. Escape cancels and Backspace cle
 
 The pen-gesture editor combines optional Ctrl, Alt, Shift, Win, B, F, M, or Space input with left, middle, right, X1, or X2 mouse and absolute pen movement. This supports Alt+Middle Mouse+Pen Drag, B+Middle Mouse+Pen Drag, and similar viewport or brush controls. Mouse buttons are released before modifiers on contact end, QuickKey release, focus loss, capture loss, profile change, disconnect, or shutdown.
 
-Preset switching updates all 18 rows immediately. Customized rows display **Custom** and are not overwritten by later preset changes. **Reset** restores one shipped row; **Reset QuickKey profile** restores all 18.
+Preset switching updates all ten rows immediately. Customized rows display **Custom** and are not overwritten by later preset changes. **Reset** restores one shipped row; **Reset QuickKey profile** restores all ten.
 
 ## Shipped profiles
 
@@ -56,7 +56,7 @@ Generic presets:
 - Generic Sculpting
 - Generic Texture Painting
 
-Application presets reserve slot 16 for touch forwarding, slot 17 for Wacom Radial Menu setup, and slot 18 for a custom action. Those slots still require learned physical sources.
+Touch forwarding, diagnostics, reset-stuck-input, Windows actions, and the Wacom Radial Menu template remain available from **Common actions** for any of the ten controls.
 
 ### Navigation requirements
 
@@ -91,7 +91,7 @@ Open/Run Application, arbitrary typed text, executable paths, scripts, and shell
 
 ### Wacom Radial Menu
 
-Configure a unique chord for Radial Menu in Wacom Center or the host's Wacom control panel. Record that chord into slot 17. The row remains **setup required** until configured. Moonlight forwards the chord normally and does not call proprietary Wacom APIs or bundle Wacom SDK content.
+Configure a unique chord for Radial Menu in Wacom Center or the host's Wacom control panel. Select **Wacom Radial Menu** from **Common actions** on the desired QuickKey, then record the matching chord. The row remains **setup required** until configured. Moonlight forwards the chord normally and does not call proprietary Wacom APIs or bundle Wacom SDK content.
 
 ## Apollo host setup
 
@@ -132,7 +132,7 @@ pwsh -File .\scripts\build-pen-diagnostics.ps1 -Configuration Release
 6. Draw into all corners at 1440p and 4K, then repeat after resizing and fullscreen changes.
 7. Hold and release every navigation gesture during contact.
 8. Disconnect during a stroke and confirm no mouse button or modifier remains held.
-9. Learn all 18 physical controls and switch repeatedly between shipped presets.
+9. Verify F1–F10 for all ten physical controls and switch repeatedly between shipped presets.
 10. Run a 30-minute mixed pen/touch/navigation session and watch for increasing latency or memory use.
 
 ## Build and privacy

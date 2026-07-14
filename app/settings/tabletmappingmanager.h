@@ -87,7 +87,7 @@ class TabletMappingManager : public QAbstractListModel
     Q_PROPERTY(QVariantList actionOptions READ actionOptions CONSTANT)
 
 public:
-    static constexpr int SlotCount = 18;
+    static constexpr int SlotCount = 10;
 
     enum Roles
     {

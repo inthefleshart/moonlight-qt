@@ -1,4 +1,4 @@
-# Moonlight PC — Native Windows Pen and Touch Fork
+# Moonlight Artist — Native Windows Pen and Touch Fork
 
 This experimental fork of [Moonlight PC](https://github.com/moonlight-stream/moonlight-qt) adds a Windows-native pen input path for pen-display clients. It captures Windows Pointer API pen events in the Moonlight streaming window and forwards them through Moonlight's existing pen protocol to a compatible Apollo or Sunshine host.
 
@@ -18,10 +18,10 @@ The feature is intended for creative applications that use Windows Ink, includin
 | Stuck-state cleanup | Implemented | Pen state is cancelled on capture loss and stream teardown. |
 | Finger touch | Preserved | Uses Moonlight's existing SDL touch path with an added pen/touch policy. |
 | Duplicate SDL pen suppression | Implemented | Native pen input is authoritative when enabled; finger touch and real mouse input remain enabled. |
-| QuickKey remapping | Implemented | Eighteen learnable source controls support recorded shortcuts, ordered key sequences, local actions, and held pen-drag gestures. |
+| QuickKey remapping | Implemented | Ten HP ZBook controls default to F1–F10 and support recorded shortcuts, ordered key sequences, local actions, and held pen-drag gestures. |
 | QuickKey profiles | Implemented | Shipped artist presets cover major painting, sculpting, DCC, and remote-Windows workflows. |
 | Diagnostics | Implemented | Aggregate in-client counters plus a separate memory-only host pressure graph and drawing canvas. |
-| Automated Windows-input tests | Passing | Covers geometry, tilt, bounded history selection, transition preservation, and the 18-control preset catalog. |
+| Automated Windows-input tests | Passing | Covers geometry, tilt, bounded history selection, transition preservation, and every ten-control preset. |
 | Debug and Release Windows builds | Passing | Full application targets compile, deploy, and produce portable ZIPs locally. |
 | Physical tablet and application validation | Pending | Pressure, touch, tilt, and corner accuracy still require real-device testing. |
 | Wintab control discovery | Not implemented | No Wacom SDK files or `Wintab32.dll` are bundled. |
@@ -66,8 +66,8 @@ The Input Settings page provides three policies:
 
 The public, driver-independent control path uses keyboard chords:
 
-1. Keep existing controls assigned to F13 through F24 or use **Learn source** for another unique chord.
-2. Select one of the shipped 18-control profiles.
+1. Assign the ten HP Create controls to F1 through F10, in physical-button order.
+2. Select one of the shipped ten-control profiles.
 3. Record a destination shortcut, ordered sequence, local action, or pen-drag gesture.
 4. Use **Reset** to restore one shipped row or reset the complete profile.
 
@@ -78,7 +78,7 @@ Profiles are available for:
 - Maya, 3ds Max, Blender, and Marmoset Toolbag
 - Windows 10/11 Remote, Maya-style navigation, 3ds Max-style navigation, sculpting, and texture-painting templates
 
-The first 12 sources remain F13–F24 for compatibility; sources 13–18 are learned explicitly. Presets are copied into editable working profiles and updates never overwrite customized rows. Modifier-only holds are supported. Pen gestures can hold keyboard modifiers and left, middle, right, X1, or X2 mouse while the pen supplies absolute movement, enabling actions such as Alt+Middle Mouse+Pen Drag.
+The ten default sources are F1–F10 and can be relearned individually. Presets are copied into editable working profiles and updates never overwrite customized rows. Modifier-only holds are supported. Pen gestures can hold keyboard modifiers and left, middle, right, X1, or X2 mouse while the pen supplies absolute movement, enabling actions such as Alt+Middle Mouse+Pen Drag.
 
 Arbitrary text, shell commands, scripts, executable paths, and application launching are intentionally unsupported.
 
@@ -113,13 +113,13 @@ No binary is published in this repository. If you have a portable ZIP produced f
 2. Optionally verify its checksum in PowerShell:
 
    ```powershell
-   Get-FileHash -Algorithm SHA256 .\MoonlightWacomPortable-x64-<version>.zip
+   Get-FileHash -Algorithm SHA256 .\MoonlightArtistPortable-x64-<version>.zip
    ```
 
 3. Create a new folder dedicated to this fork.
-4. Extract the complete ZIP into that folder. Do not run `Moonlight.exe` from inside the ZIP.
-5. Confirm that `portable.dat` is beside `Moonlight.exe`. This keeps this portable copy's settings in its own folder.
-6. Close any running official Moonlight instance, then start `Moonlight.exe` from the extracted folder.
+4. Extract the complete ZIP into that folder. Do not run `MoonlightArtist.exe` from inside the ZIP.
+5. Confirm that `portable.dat` is beside `MoonlightArtist.exe`. This keeps this portable copy's settings in its own folder.
+6. Start `MoonlightArtist.exe`. Its executable name, window title, product metadata, settings identity, and ZIP name are distinct from official Moonlight.
 
 This does not replace the normally installed Moonlight client. Keep the fork in a separate folder and create a clearly named shortcut if desired. Avoid running the official and experimental clients simultaneously.
 
@@ -205,7 +205,7 @@ pwsh -File .\scripts\build-windows.ps1 -Configuration Release
 pwsh -File .\scripts\package-windows.ps1 -Configuration Release -SkipBuild
 ```
 
-The packaging command prints SHA-256 checksums for `MoonlightWacomPortable-x64-<version>.zip` and the separate `MoonlightPenDiagnostics.exe` host utility.
+The packaging command prints SHA-256 checksums for `MoonlightArtistPortable-x64-<version>.zip` and the separate `MoonlightPenDiagnostics.exe` host utility.
 
 Portable builds skip the WiX/MSI restore by default. Add `-BuildInstaller` only when an MSI is explicitly required and WiX 7/NuGet have been configured. Use `-Clean` for a from-scratch build; without it, the wrapper resumes incrementally.
 
@@ -265,14 +265,14 @@ For a visual pressure graph and drawable test canvas, run the separately package
 
 ### Tablet QuickKeys
 
-1. In the tablet manufacturer control panel, assign unique, otherwise-unused source chords. F13 through F24 are recommended for the first twelve controls.
-2. Open **Settings > Windows Pen, Touch, and QuickKeys** and select an application or generic profile. All 18 rows update immediately.
+1. In HP Create Control Center, assign the ten physical controls to F1 through F10 in order.
+2. Open **Settings > Input Settings**, choose a preset, and confirm that all ten rows update immediately.
 3. Click **Learn source**, then press and release the physical control to associate it with a row.
 4. Click **Record shortcut** and press the desired keyboard chord. Modifier-only holds such as Shift and Ctrl are valid. `Esc` cancels and `Backspace` clears.
 5. Use **Sequence** for ordered key presses such as ZBrush brush selectors.
 6. Use **Pen gesture** for held navigation such as Alt + Middle Mouse + Pen Drag, B + Pen Drag, or F + Pen Drag.
 7. Use **Common action** for touch forwarding, diagnostics, Windows shortcuts, reset-stuck-input, or the Wacom Radial Menu chord template.
-8. Use **Reset** for one row or **Reset profile** for all 18 shipped rows. Customized rows are preserved until explicitly reset.
+8. Use **Reset** for one row or **Reset QuickKey profile** for all ten shipped rows. Customized rows are preserved until explicitly reset.
 
 Mappings are stored in the portable build's local settings. A profile is selected manually; profiles do not automatically follow the active remote application.
 

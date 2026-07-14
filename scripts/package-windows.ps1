@@ -12,13 +12,13 @@ if (-not $SkipBuild) {
 }
 
 $configName = $Configuration.ToLowerInvariant()
-$source = Get-ChildItem (Join-Path $root "build\installer-x64-$configName\MoonlightPortable-*.zip") |
+$source = Get-ChildItem (Join-Path $root "build\installer-x64-$configName\MoonlightArtistPortable-*.zip") |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (-not $source) { throw 'Portable package was not produced.' }
 
 $artifactDir = Join-Path $root 'artifacts'
 New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
-$destination = Join-Path $artifactDir ($source.BaseName.Replace('MoonlightPortable', 'MoonlightWacomPortable') + $source.Extension)
+$destination = Join-Path $artifactDir ($source.BaseName + $source.Extension)
 Copy-Item -LiteralPath $source.FullName -Destination $destination -Force
 Get-FileHash -Algorithm SHA256 -LiteralPath $destination | Format-List
 

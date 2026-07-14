@@ -141,22 +141,30 @@ bool TabletControlAction::valid() const
 
 QString TabletControlAction::displayText() const
 {
-    if (!name.isEmpty()) return name;
     if (kind == TabletActionKind::Disabled) return QStringLiteral("Unassigned");
     if (kind == TabletActionKind::PassThrough) return QStringLiteral("Pass through");
-    if (kind == TabletActionKind::KeyChord || kind == TabletActionKind::WacomRadialChord)
-        return TabletMappingManager::keyStrokeText(chord);
+    QString details;
+    if (kind == TabletActionKind::KeyChord || kind == TabletActionKind::WacomRadialChord) {
+        details = TabletMappingManager::keyStrokeText(chord);
+        if (activation == TabletActivation::Hold && !details.isEmpty()) details += " (hold)";
+    }
+    if (kind == TabletActionKind::KeySequence) {
+        QStringList steps;
+        for (const auto& step : sequence) steps.append(TabletMappingManager::keyStrokeText(step));
+        details = steps.join(QStringLiteral(" → "));
+    }
     if (kind == TabletActionKind::PenGesture) {
-        QString text = TabletMappingManager::keyStrokeText(chord);
+        details = TabletMappingManager::keyStrokeText(chord);
         const QString button = mouseButton == TabletMouseLeft ? "Left Mouse" :
                                mouseButton == TabletMouseMiddle ? "Middle Mouse" :
                                mouseButton == TabletMouseRight ? "Right Mouse" :
                                mouseButton == TabletMouseX1 ? "Mouse X1" :
                                mouseButton == TabletMouseX2 ? "Mouse X2" : QString();
-        if (!button.isEmpty()) text += (text.isEmpty() ? "" : " + ") + button;
-        return text + " + Pen Drag";
+        if (!button.isEmpty()) details += (details.isEmpty() ? "" : " + ") + button;
+        details += (details.isEmpty() ? "" : " + ") + QStringLiteral("Pen Drag");
     }
-    return QStringLiteral("Configured action");
+    if (details.isEmpty()) return name.isEmpty() ? QStringLiteral("Configured action") : name;
+    return name.isEmpty() || name == details ? details : name + QStringLiteral(" — ") + details;
 }
 
 QString TabletSourceShortcut::displayText() const
@@ -179,9 +187,9 @@ TabletMappingManager::TabletMappingManager(QObject* parent)
         if (!configured.isEmpty()) {
             const auto stroke = parseStroke(configured);
             m_Sources[slot] = {stroke, stroke.virtualKey != 0};
-        } else if (slot < 12) {
+        } else {
             TabletKeyStroke stroke;
-            stroke.virtualKey = static_cast<quint16>(0x7C + slot); // F13-F24
+            stroke.virtualKey = static_cast<quint16>(0x70 + slot); // F1-F10
             m_Sources[slot] = {stroke, true};
         }
     }
@@ -625,12 +633,9 @@ void TabletMappingManager::buildShippedProfiles()
         QVector<TabletControlAction> profile(SlotCount);
         int slot = 0;
         for (const auto& action : actions) {
-            if (slot >= 15) break;
+            if (slot >= SlotCount) break;
             profile[slot++] = action;
         }
-        profile[15] = local("Touch forwarding on/off", TabletLocalAction::ToggleTouch);
-        profile[16] = radial();
-        profile[17] = {};
         m_ProfileOrder.append(name);
         m_ProfileIds.insert(name, id);
         m_ShippedProfiles.insert(name, profile);
@@ -650,31 +655,25 @@ void TabletMappingManager::buildShippedProfiles()
         chord("Fit on screen", "Ctrl+0"), chord("Hide extras", "Ctrl+H")});
     add("Substance 3D Painter", "substance", {chord("Undo", "Ctrl+Z"),
         chord("Redo", "Ctrl+Y"), chord("Save", "Ctrl+S"), chord("Paint", "1"),
-        chord("Eraser", "2"), chord("Color Picker", "P"), chord("Decrease brush size", "["),
-        chord("Increase brush size", "]"), gesture("Orbit", "Alt", TabletMouseLeft),
-        gesture("Pan", "Alt", TabletMouseMiddle), gesture("Zoom", "Alt", TabletMouseRight),
-        chord("Focus", "F")});
+        chord("Eraser", "2"), chord("Color Picker", "P"),
+        gesture("Orbit", "Alt", TabletMouseLeft), gesture("Pan", "Alt", TabletMouseMiddle),
+        gesture("Zoom", "Alt", TabletMouseRight), chord("Focus", "F")});
     add("ZBrush — Right-Click Navigation", "zbrush", {chord("Undo", "Ctrl+Z"),
         chord("Redo", "Ctrl+Shift+Z"), chord("Save Project", "Ctrl+S"),
-        chord("Brush palette", "F2"), chord("Quick Menu", "Space"),
-        sequence("Standard Brush", {"B", "S", "T"}), sequence("Clay Buildup", {"B", "C", "B"}),
-        sequence("Move Brush", {"B", "M", "V"}), chord("Temporary Smooth", "Shift", TabletActivation::Hold),
+        chord("Quick Menu", "Space"), chord("Temporary Smooth", "Shift", TabletActivation::Hold),
         chord("Invert brush", "Alt", TabletActivation::Hold), gesture("Rotate", {}, TabletMouseRight),
         gesture("Pan", "Alt", TabletMouseRight), gesture("Scale / Zoom", "Ctrl", TabletMouseRight),
-        chord("Frame", "F"), chord("Hide / show interface", "Tab")});
+        chord("Frame", "F")});
     add("Mudbox", "mudbox", {chord("Undo", "Ctrl+Z"), chord("Redo", "Ctrl+Y"),
         chord("Save", "Ctrl+S"), gesture("Brush size", "B", TabletMouseLeft),
         gesture("Brush strength", "M", TabletMouseLeft), chord("Temporary Smooth", "Shift", TabletActivation::Hold),
-        chord("Invert sculpting", "Ctrl", TabletActivation::Hold), chord("Focus beneath cursor", "F"),
-        chord("Frame selection / all", "A"), gesture("Orbit", "Alt", TabletMouseLeft),
+        chord("Invert sculpting", "Ctrl", TabletActivation::Hold), gesture("Orbit", "Alt", TabletMouseLeft),
         gesture("Track / Pan", "Alt", TabletMouseMiddle), gesture("Dolly", "Alt", TabletMouseRight),
         gesture("Camera roll", "Alt+Shift", TabletMouseMiddle),
         gesture("Camera 2D pan", "Ctrl+Alt", TabletMouseMiddle)});
     add("Mari", "mari", {chord("Undo", "Ctrl+Z"), chord("Redo", "Ctrl+Shift+Z"),
         chord("Save", "Ctrl+S"), chord("Paint", "P"), chord("Eraser", "E"),
-        chord("Paint Through", "U"), chord("Color Picker", "C"),
-        chord("Decrease brush radius", "-"), chord("Increase brush radius", "="),
-        chord("Decrease opacity", "["), chord("Increase opacity", "]"),
+        chord("Color Picker", "C"),
         gesture("Orbit", "Alt", TabletMouseLeft), gesture("Pan", "Alt", TabletMouseMiddle),
         gesture("Zoom", "Alt", TabletMouseRight), chord("Focus", "A")});
     add("Daz Studio — Keyboard Navigation", "daz", {chord("Undo", "Ctrl+Z"),
@@ -687,59 +686,45 @@ void TabletMappingManager::buildShippedProfiles()
         chord("Bank right", "O", TabletActivation::Hold)});
     add("3DCoat — Default Navigation", "3dcoat", {chord("Undo", "Ctrl+Z"),
         chord("Redo", "Ctrl+Y"), chord("Save", "Ctrl+S"), chord("Tool / color popup", "Space"),
-        chord("Main paint functions", "`"), chord("Temporary Smooth", "Shift", TabletActivation::Hold),
-        chord("Alternate operation", "Ctrl", TabletActivation::Hold), chord("Decrease brush radius", "["),
-        chord("Increase brush radius", "]"), gesture("Orbit", "Alt", TabletMouseLeft),
+        chord("Temporary Smooth", "Shift", TabletActivation::Hold),
+        chord("Alternate operation", "Ctrl", TabletActivation::Hold), gesture("Orbit", "Alt", TabletMouseLeft),
         gesture("Pan", "Alt", TabletMouseMiddle), gesture("Zoom", "Alt", TabletMouseRight),
-        chord("Set navigation pivot", "F"), chord("Hide / show interface", "Tab")});
+        chord("Set navigation pivot", "F")});
     add("Maya", "maya", {chord("Undo", "Ctrl+Z"), chord("Redo", "Ctrl+Y"),
         chord("Save", "Ctrl+S"), chord("Select", "Q"), chord("Move", "W"),
-        chord("Rotate", "E"), chord("Scale", "R"), gesture("Brush size", "B", TabletMouseMiddle),
-        gesture("Brush strength", "M", TabletMouseMiddle), chord("Temporary Smooth", "Shift", TabletActivation::Hold),
-        chord("Invert sculpting", "Ctrl", TabletActivation::Hold), gesture("Tumble", "Alt", TabletMouseLeft),
-        gesture("Track", "Alt", TabletMouseMiddle), gesture("Dolly", "Alt", TabletMouseRight),
-        chord("Frame beneath cursor", "F")});
+        chord("Rotate", "E"), chord("Scale", "R"), gesture("Tumble", "Alt", TabletMouseLeft),
+        gesture("Track", "Alt", TabletMouseMiddle), gesture("Dolly", "Alt", TabletMouseRight)});
     add("3ds Max — Standard Interaction", "3dsmax", {chord("Undo", "Ctrl+Z"),
         chord("Redo", "Ctrl+Y"), chord("Save", "Ctrl+S"), chord("Select", "Q"),
         chord("Move", "W"), chord("Rotate", "E"), chord("Scale", "R"),
-        chord("Wireframe / smooth", "F3"), chord("Edged faces", "F4"),
-        chord("Maximize viewport", "Alt+W"), gesture("Pan", {}, TabletMouseMiddle),
-        gesture("Orbit", "Alt", TabletMouseMiddle), chord("Frame selection", "Z"),
+        gesture("Pan", {}, TabletMouseMiddle), gesture("Orbit", "Alt", TabletMouseMiddle),
+        chord("Frame selection", "Z"),
         chord("Pan mode", "Ctrl+P"), chord("Orbit mode", "Ctrl+R")});
     add("Blender — Default Keymap", "blender", {chord("Undo", "Ctrl+Z"),
         chord("Redo", "Ctrl+Shift+Z"), chord("Save", "Ctrl+S"), chord("Quick Favorites", "Q"),
-        chord("Operator Search", "F3"), chord("Edit / Object mode", "Tab"),
-        chord("Mode pie", "Ctrl+Tab"), gesture("Brush size", "F", TabletMouseNone),
-        gesture("Brush strength", "Shift+F", TabletMouseNone), chord("Invert brush", "Ctrl", TabletActivation::Hold),
-        chord("Smooth brush", "Shift", TabletActivation::Hold), gesture("Orbit", {}, TabletMouseMiddle),
-        gesture("Pan", "Shift", TabletMouseMiddle), gesture("Dolly / Zoom", "Ctrl", TabletMouseMiddle),
-        chord("Frame selected", "Numpad .")});
+        chord("Edit / Object mode", "Tab"), gesture("Brush size", "F", TabletMouseNone),
+        gesture("Brush strength", "Shift+F", TabletMouseNone), gesture("Orbit", {}, TabletMouseMiddle),
+        gesture("Pan", "Shift", TabletMouseMiddle), gesture("Dolly / Zoom", "Ctrl", TabletMouseMiddle)});
     add("Marmoset Toolbag", "marmoset", {chord("Undo", "Ctrl+Z"),
         chord("Redo", "Ctrl+Shift+Z"), chord("Save", "Ctrl+S"), chord("Paint", "B"),
         chord("Erase / Rotate", "E"), chord("Color Picker", "P"),
-        chord("Decrease brush size", "["), chord("Increase brush size", "]"),
-        chord("Select", "Q"), chord("Translate", "W"), chord("Scale", "R"),
         gesture("Orbit", "Alt", TabletMouseLeft), gesture("Pan", "Alt", TabletMouseMiddle),
         gesture("Zoom", "Alt", TabletMouseRight), chord("Frame selection", "Ctrl+F")});
 
     add("Windows 10 Remote", "windows10", {chord("Undo", "Ctrl+Z"), chord("Redo", "Ctrl+Y"),
-        chord("Save", "Ctrl+S"), chord("Cut", "Ctrl+X"), chord("Copy", "Ctrl+C"),
-        chord("Paste", "Ctrl+V"), chord("Next application", "Alt+Tab"),
-        chord("Previous application", "Alt+Shift+Tab"), chord("File Explorer", "Meta+E"),
-        chord("Action Center", "Meta+A"), chord("On-Screen Keyboard", "Meta+Ctrl+O"),
-        gesture("Middle-click pen gesture", {}, TabletMouseMiddle),
-        gesture("Right-click pen gesture", {}, TabletMouseRight), chord("Show desktop", "Meta+D"),
-        local("Toggle diagnostics", TabletLocalAction::ToggleDiagnostics)});
+        chord("Copy", "Ctrl+C"), chord("Paste", "Ctrl+V"),
+        chord("Next application", "Alt+Tab"), chord("Previous application", "Alt+Shift+Tab"),
+        chord("File Explorer", "Meta+E"), chord("Action Center", "Meta+A"),
+        chord("On-Screen Keyboard", "Meta+Ctrl+O"),
+        gesture("Middle-click pen gesture", {}, TabletMouseMiddle)});
     add("Windows 11 Remote", "windows11", {chord("Undo", "Ctrl+Z"), chord("Redo", "Ctrl+Y"),
-        chord("Save", "Ctrl+S"), chord("Cut", "Ctrl+X"), chord("Copy", "Ctrl+C"),
-        chord("Paste", "Ctrl+V"), chord("Next application", "Alt+Tab"),
-        chord("Previous application", "Alt+Shift+Tab"), chord("File Explorer", "Meta+E"),
-        chord("Quick Settings", "Meta+A"), chord("Notifications", "Meta+N"),
-        chord("On-Screen Keyboard", "Meta+Ctrl+O"), gesture("Middle-click pen gesture", {}, TabletMouseMiddle),
-        gesture("Right-click pen gesture", {}, TabletMouseRight), chord("Show desktop", "Meta+D")});
+        chord("Copy", "Ctrl+C"), chord("Paste", "Ctrl+V"),
+        chord("Next application", "Alt+Tab"), chord("Previous application", "Alt+Shift+Tab"),
+        chord("File Explorer", "Meta+E"), chord("Quick Settings", "Meta+A"),
+        chord("Notifications", "Meta+N"), chord("On-Screen Keyboard", "Meta+Ctrl+O")});
     add("Maya-Style 3D Navigation", "maya-style", {chord("Undo", "Ctrl+Z"),
         chord("Redo", "Ctrl+Y"), chord("Save", "Ctrl+S"), chord("Select", "Q"),
-        chord("Move", "W"), chord("Rotate", "E"), chord("Scale", "R"), chord("Frame", "F"),
+        chord("Move", "W"), chord("Rotate", "E"), chord("Scale", "R"),
         gesture("Orbit", "Alt", TabletMouseLeft), gesture("Pan", "Alt", TabletMouseMiddle),
         gesture("Zoom", "Alt", TabletMouseRight), gesture("Brush size", "B", TabletMouseMiddle),
         gesture("Brush strength", "M", TabletMouseMiddle), chord("Smooth", "Shift", TabletActivation::Hold),
@@ -747,24 +732,21 @@ void TabletMappingManager::buildShippedProfiles()
     add("3ds Max-Style 3D Navigation", "max-style", {chord("Undo", "Ctrl+Z"),
         chord("Redo", "Ctrl+Y"), chord("Save", "Ctrl+S"), chord("Select", "Q"),
         chord("Move", "W"), chord("Rotate", "E"), chord("Scale", "R"),
-        chord("Frame", "Z"), gesture("Pan", {}, TabletMouseMiddle),
-        gesture("Orbit", "Alt", TabletMouseMiddle), chord("Wireframe / smooth", "F3"),
+        gesture("Pan", {}, TabletMouseMiddle), gesture("Orbit", "Alt", TabletMouseMiddle),
+        chord("Frame", "Z"), chord("Wireframe / smooth", "F3"),
         chord("Edged faces", "F4"), chord("Maximize viewport", "Alt+W"),
         chord("Pan mode", "Ctrl+P"), chord("Orbit mode", "Ctrl+R")});
     add("Generic Sculpting", "sculpting", {chord("Undo", "Ctrl+Z"),
         chord("Redo", "Ctrl+Shift+Z"), chord("Save", "Ctrl+S"),
         chord("Decrease brush size", "["), chord("Increase brush size", "]"),
         chord("Smooth", "Shift", TabletActivation::Hold), chord("Invert", "Ctrl", TabletActivation::Hold),
-        chord("Quick menu", "Space"), chord("Hide / show interface", "Tab"),
         gesture("Orbit", "Alt", TabletMouseLeft), gesture("Pan", "Alt", TabletMouseMiddle),
-        gesture("Zoom", "Alt", TabletMouseRight), chord("Frame", "F"),
+        gesture("Zoom", "Alt", TabletMouseRight),
         gesture("Middle-click pen gesture", {}, TabletMouseMiddle),
         local("Toggle diagnostics", TabletLocalAction::ToggleDiagnostics)});
     add("Generic Texture Painting", "texture-painting", {chord("Undo", "Ctrl+Z"),
         chord("Redo", "Ctrl+Shift+Z"), chord("Save", "Ctrl+S"), chord("Paint", "B"),
-        chord("Erase", "E"), chord("Picker", "P"), chord("Decrease brush size", "["),
-        chord("Increase brush size", "]"), chord("Decrease opacity", "-"),
-        chord("Increase opacity", "="), gesture("Orbit", "Alt", TabletMouseLeft),
+        chord("Erase", "E"), chord("Picker", "P"), gesture("Orbit", "Alt", TabletMouseLeft),
         gesture("Pan", "Alt", TabletMouseMiddle), gesture("Zoom", "Alt", TabletMouseRight),
         chord("Frame", "F"), local("Toggle diagnostics", TabletLocalAction::ToggleDiagnostics)});
 
@@ -801,7 +783,7 @@ void TabletMappingManager::migrateLegacySettings()
     if (settings.value("tabletMappings/schema", 1).toInt() >= kSettingsSchema) return;
     const QStringList legacyProfiles = {"Default", "Krita", "Photoshop", "Substance 3D Painter"};
     for (const auto& profile : legacyProfiles) {
-        for (int slot = 0; slot < 12; ++slot) {
+        for (int slot = 0; slot < SlotCount; ++slot) {
             const QString oldKey = QString("tabletMappings/profiles/%1/slot%2").arg(profile).arg(slot + 1);
             const QString value = settings.value(oldKey).toString();
             if (value.isEmpty()) continue;

@@ -1,9 +1,9 @@
 ﻿<?define ShortName = "Moonlight" ?>
-<?define FullName = "Moonlight Game Streaming Client" ?>
+<?define FullName = "Moonlight Artist Pen Streaming Client" ?>
 
-<?define ShortcutName = "$(var.ShortName)" ?>
+<?define ShortcutName = "Moonlight Artist" ?>
 <?define ShortcutDesc = "Stream games and other applications from another PC" ?>
-<?define InstallFolder = "Moonlight Game Streaming" ?>
+<?define InstallFolder = "Moonlight Artist" ?>
 
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:fire="http://wixtoolset.org/schemas/v4/wxs/firewall" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
@@ -11,17 +11,17 @@
            Language="1033"
            Version="!(bind.fileVersion.MoonlightExe)"
            Manufacturer="Moonlight Game Streaming Project"
-           UpgradeCode="5c09f94e-f809-4c6a-9b7b-597c99f041fe">
+           UpgradeCode="872873c8-fa3e-4637-87ac-90c8a5d70a05">
     <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." Schedule="afterInstallInitialize" />
     <MediaTemplate CompressionLevel="high" EmbedCab="yes" />
 
-    <Property Id="APPDATAFOLDER" Value="%LOCALAPPDATA%\Moonlight Game Streaming Project" />
+    <Property Id="APPDATAFOLDER" Value="%LOCALAPPDATA%\Moonlight Game Streaming Project\Moonlight Artist" />
 
     <!-- There's no way to delete a registry key on uninstall but not major upgrade, so
         we have to roll our own deletion via custom action -->
     <CustomAction Id="DeleteRegistryKey"
                   Directory="ProgramFiles6432Folder"
-                  ExeCommand="reg.exe delete &quot;HKCU\Software\Moonlight Game Streaming Project&quot; /f"
+                  ExeCommand="reg.exe delete &quot;HKCU\Software\Moonlight Game Streaming Project\Moonlight Artist&quot; /f"
                   Execute="deferred"
                   Return="ignore"
                   Impersonate="yes" />
@@ -45,7 +45,7 @@
                            On="uninstall"
                            Property="APPDATAFOLDER" />
       <RegistryValue Root="HKCU"
-                     Key="Software\Moonlight Game Streaming Project"
+                     Key="Software\Moonlight Game Streaming Project\Moonlight Artist"
                      Name="Installed"
                      Type="integer"
                      Value="1"
@@ -63,7 +63,7 @@
                     Directory="DesktopFolder"
                     On="uninstall" />
       <RegistryValue Root="HKCU"
-                     Key="Software\Moonlight Game Streaming Project"
+                     Key="Software\Moonlight Game Streaming Project\Moonlight Artist"
                      Name="DesktopShortcutInstalled"
                      Type="integer"
                      Value="1"
@@ -75,7 +75,7 @@
          product -->
     <Component Id="MoonlightDesktopShortcutState" Directory="INSTALLFOLDER">
       <RegistryValue Root="HKCU"
-                     Key="Software\Moonlight Game Streaming Project"
+                     Key="Software\Moonlight Game Streaming Project\Moonlight Artist"
                      Name="DesktopShortcutInstallState"
                      Type="integer"
                      Value="[ADDDESKTOPSHORTCUT]"
@@ -87,7 +87,7 @@
         <File Id="MoonlightExe"
               KeyPath="yes"
               Checksum="yes"
-              Source="$(var.BuildDir)\app\$(var.Configuration)\Moonlight.exe">
+              Source="$(var.BuildDir)\app\$(var.Configuration)\MoonlightArtist.exe">
           <fire:FirewallException Id="MoonlightFirewallException"
                                   Scope="any"
                                   IgnoreFailure="yes"

@@ -16,7 +16,7 @@ private slots:
     void convertsApolloCompatibleTilt();
     void preservesUnknownTilt();
     void pointerHistoryPreservesTransitionsAndNewest();
-    void shippedProfilesExposeEighteenControls();
+    void shippedProfilesExposeTenControls();
 };
 
 void WindowsInputTests::matchingResolutionMapsCorners()
@@ -102,7 +102,7 @@ void WindowsInputTests::pointerHistoryPreservesTransitionsAndNewest()
     QVERIFY(keptTransition96);
 }
 
-void WindowsInputTests::shippedProfilesExposeEighteenControls()
+void WindowsInputTests::shippedProfilesExposeTenControls()
 {
     QCoreApplication::setOrganizationName("MoonlightInputTests");
     QCoreApplication::setApplicationName("MoonlightInputTests");
@@ -110,32 +110,46 @@ void WindowsInputTests::shippedProfilesExposeEighteenControls()
 
     auto* manager = TabletMappingManager::get();
     QCOMPARE(manager->rowCount(), TabletMappingManager::SlotCount);
-    QVERIFY(manager->profiles().contains("ZBrush — Right-Click Navigation"));
-    QVERIFY(manager->profiles().contains("Mudbox"));
-    QVERIFY(manager->profiles().contains("Mari"));
-    QVERIFY(manager->profiles().contains("Daz Studio — Keyboard Navigation"));
-    QVERIFY(manager->profiles().contains("3DCoat — Default Navigation"));
-    QVERIFY(manager->profiles().contains("Maya"));
-    QVERIFY(manager->profiles().contains("3ds Max — Standard Interaction"));
-    QVERIFY(manager->profiles().contains("Blender — Default Keymap"));
-    QVERIFY(manager->profiles().contains("Marmoset Toolbag"));
+    const QStringList requiredProfiles = {
+        "Krita", "Photoshop", "Substance 3D Painter", "ZBrush — Right-Click Navigation",
+        "Mudbox", "Mari", "Daz Studio — Keyboard Navigation", "3DCoat — Default Navigation",
+        "Maya", "3ds Max — Standard Interaction", "Blender — Default Keymap",
+        "Marmoset Toolbag", "Windows 10 Remote", "Windows 11 Remote",
+        "Maya-Style 3D Navigation", "3ds Max-Style 3D Navigation", "Generic Sculpting",
+        "Generic Texture Painting", "Blank / Pass-Through"
+    };
+    for (const auto& profile : requiredProfiles) {
+        QVERIFY2(manager->profiles().contains(profile), qPrintable(profile));
+    }
 
     for (const auto& profile : manager->profiles()) {
         manager->setActiveProfile(profile);
-        QCOMPARE(manager->rowCount(), TabletMappingManager::SlotCount);
-        if (profile != "Default" && profile != "Blank / Pass-Through") {
-            QCOMPARE(manager->actionForSlot(15).localAction, TabletLocalAction::ToggleTouch);
-            QCOMPARE(manager->actionForSlot(16).kind, TabletActionKind::WacomRadialChord);
+        QCOMPARE(manager->rowCount(), 10);
+        for (int slot = 0; slot < TabletMappingManager::SlotCount; ++slot) {
+            QVERIFY2(manager->actionForSlot(slot).valid(), qPrintable(profile));
         }
     }
 
     manager->setActiveProfile("ZBrush — Right-Click Navigation");
-    QVERIFY(manager->actionForSlot(8).valid());   // Shift hold
-    QVERIFY(manager->actionForSlot(10).valid());  // RMB pen gesture
-    QVERIFY(manager->actionForSlot(11).valid());  // Alt+RMB pen gesture
+    QCOMPARE(manager->actionForSlot(4).activation, TabletActivation::Hold);
+    QCOMPARE(manager->actionForSlot(6).kind, TabletActionKind::PenGesture);
+    QCOMPARE(manager->actionForSlot(7).kind, TabletActionKind::PenGesture);
     manager->setActiveProfile("Blender — Default Keymap");
-    QVERIFY(manager->actionForSlot(7).valid());   // F + pen movement
-    QVERIFY(manager->actionForSlot(9).valid());   // Ctrl hold
+    QCOMPARE(manager->actionForSlot(5).kind, TabletActionKind::PenGesture);
+    QCOMPARE(manager->actionForSlot(7).kind, TabletActionKind::PenGesture);
+
+    for (int slot = 0; slot < TabletMappingManager::SlotCount; ++slot) {
+        const auto source = manager->sourceForSlot(slot);
+        QVERIFY(source.valid);
+        QCOMPARE(source.chord.virtualKey, static_cast<quint16>(0x70 + slot));
+    }
+
+    QSignalSpy resetSpy(manager, &QAbstractItemModel::modelReset);
+    manager->setActiveProfile("Krita");
+    QCOMPARE(resetSpy.count(), 1);
+    QCOMPARE(manager->data(manager->index(0), TabletMappingManager::ActionNameRole).toString(),
+             QString("Undo"));
+    QVERIFY(manager->data(manager->index(0), TabletMappingManager::ActionTextRole).toString().contains("Ctrl+Z"));
 }
 
 QTEST_GUILESS_MAIN(WindowsInputTests)
