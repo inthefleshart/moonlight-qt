@@ -53,6 +53,7 @@
 #include "backend/systemproperties.h"
 #include "streaming/session.h"
 #include "settings/streamingpreferences.h"
+#include "settings/tabletmappingmanager.h"
 #include "gui/sdlgamepadkeynavigation.h"
 
 #if defined(Q_OS_WIN32)
@@ -600,9 +601,12 @@ int main(int argc, char *argv[])
     // Let us see the true VBlank rather than DWM's approximation. We do this here
     // because this API must be called before the first swapchain (which Qt will
     // create when the window is displayed). This is supported on Win11 22H2+.
+    // Keep building with older Windows 10 SDK headers. The entry point is
+    // resolved dynamically because it is only present on Windows 11 22H2+.
+    using DXGIDisableVBlankVirtualizationFn = HRESULT (WINAPI*)();
     auto fnDXGIDisableVBlankVirtualization =
-        (decltype(DXGIDisableVBlankVirtualization)*)GetProcAddress(GetModuleHandleW(L"dxgi.dll"),
-                                                                   "DXGIDisableVBlankVirtualization");
+        reinterpret_cast<DXGIDisableVBlankVirtualizationFn>(
+            GetProcAddress(GetModuleHandleW(L"dxgi.dll"), "DXGIDisableVBlankVirtualization"));
     if (fnDXGIDisableVBlankVirtualization) {
         fnDXGIDisableVBlankVirtualization();
     }
@@ -962,6 +966,11 @@ int main(int argc, char *argv[])
                                                    "StreamingPreferences",
                                                    [](QQmlEngine* qmlEngine, QJSEngine*) -> QObject* {
                                                        return StreamingPreferences::get(qmlEngine);
+                                                   });
+    qmlRegisterSingletonType<TabletMappingManager>("TabletMappingManager", 1, 0,
+                                                   "TabletMappingManager",
+                                                   [](QQmlEngine* engine, QJSEngine*) -> QObject* {
+                                                       return TabletMappingManager::get(engine);
                                                    });
 
     // Create the identity manager on the main thread

@@ -51,6 +51,9 @@
 #define SER_CAPTURESYSKEYS "capturesyskeys"
 #define SER_KEEPAWAKE "keepawake"
 #define SER_LANGUAGE "language"
+#define SER_NATIVEPENINPUT "nativepeninput"
+#define SER_INPUTDIAGNOSTICS "inputdiagnostics"
+#define SER_TOUCHPOLICY "touchpolicy"
 
 #define CURRENT_DEFAULT_VER 2
 
@@ -136,6 +139,17 @@ void StreamingPreferences::reload()
     quitAppAfter = settings.value(SER_QUITAPPAFTER, false).toBool();
     absoluteMouseMode = settings.value(SER_ABSMOUSEMODE, false).toBool();
     absoluteTouchMode = settings.value(SER_ABSTOUCHMODE, true).toBool();
+#ifdef Q_OS_WIN32
+    nativePenInput = settings.value(SER_NATIVEPENINPUT, true).toBool();
+#else
+    nativePenInput = false;
+#endif
+    inputDiagnostics = settings.value(SER_INPUTDIAGNOSTICS, false).toBool();
+    touchPolicy = static_cast<TouchPolicy>(settings.value(
+        SER_TOUCHPOLICY, static_cast<int>(TouchPolicy::TOUCH_WINDOWS_DEFAULT)).toInt());
+    if (touchPolicy < TOUCH_WINDOWS_DEFAULT || touchPolicy > TOUCH_ALWAYS_FORWARD) {
+        touchPolicy = TOUCH_WINDOWS_DEFAULT;
+    }
     framePacing = settings.value(SER_FRAMEPACING, false).toBool();
     connectionWarnings = settings.value(SER_CONNWARNINGS, true).toBool();
     configurationWarnings = settings.value(SER_CONFWARNINGS, true).toBool();
@@ -334,6 +348,9 @@ void StreamingPreferences::save()
     settings.setValue(SER_QUITAPPAFTER, quitAppAfter);
     settings.setValue(SER_ABSMOUSEMODE, absoluteMouseMode);
     settings.setValue(SER_ABSTOUCHMODE, absoluteTouchMode);
+    settings.setValue(SER_NATIVEPENINPUT, nativePenInput);
+    settings.setValue(SER_INPUTDIAGNOSTICS, inputDiagnostics);
+    settings.setValue(SER_TOUCHPOLICY, static_cast<int>(touchPolicy));
     settings.setValue(SER_FRAMEPACING, framePacing);
     settings.setValue(SER_CONNWARNINGS, connectionWarnings);
     settings.setValue(SER_CONFWARNINGS, configurationWarnings);

@@ -6,6 +6,68 @@
 #define VK_0 0x30
 #define VK_A 0x41
 
+bool SdlInputHandler::handleTabletMappedKey(SDL_KeyboardEvent* event)
+{
+    if (event->keysym.scancode < SDL_SCANCODE_F13 || event->keysym.scancode > SDL_SCANCODE_F24) {
+        return false;
+    }
+
+    const int slot = event->keysym.scancode - SDL_SCANCODE_F13;
+    if (event->state == SDL_PRESSED) {
+        const TabletMappedShortcut shortcut = TabletMappingManager::get()->mappedShortcut(slot);
+        if (!shortcut.valid) {
+            return false;
+        }
+        m_ActiveTabletMappings[slot] = shortcut;
+        sendTabletShortcut(shortcut, true);
+        return true;
+    }
+
+    const TabletMappedShortcut shortcut = m_ActiveTabletMappings[slot];
+    if (!shortcut.valid) {
+        return false;
+    }
+    sendTabletShortcut(shortcut, false);
+    m_ActiveTabletMappings[slot] = {};
+    return true;
+}
+
+void SdlInputHandler::sendTabletShortcut(const TabletMappedShortcut& shortcut, bool pressed)
+{
+    const char modifiers = (shortcut.control ? MODIFIER_CTRL : 0) |
+                           (shortcut.alt ? MODIFIER_ALT : 0) |
+                           (shortcut.shift ? MODIFIER_SHIFT : 0) |
+                           (shortcut.meta ? MODIFIER_META : 0);
+
+    struct ModifierKey { bool enabled; short virtualKey; };
+    const ModifierKey modifierKeys[] = {
+        {shortcut.control, 0xA2},
+        {shortcut.alt, 0xA4},
+        {shortcut.shift, 0xA0},
+        {shortcut.meta, 0x5B},
+    };
+
+    if (pressed) {
+        for (const auto& modifier : modifierKeys) {
+            if (modifier.enabled) {
+                LiSendKeyboardEvent2(0x8000 | modifier.virtualKey, KEY_ACTION_DOWN, modifiers, 0);
+                m_KeysDown.insert(modifier.virtualKey);
+            }
+        }
+        LiSendKeyboardEvent2(0x8000 | shortcut.virtualKey, KEY_ACTION_DOWN, modifiers, 0);
+        m_KeysDown.insert(shortcut.virtualKey);
+    } else {
+        LiSendKeyboardEvent2(0x8000 | shortcut.virtualKey, KEY_ACTION_UP, modifiers, 0);
+        m_KeysDown.remove(shortcut.virtualKey);
+        for (int i = 3; i >= 0; --i) {
+            if (modifierKeys[i].enabled) {
+                LiSendKeyboardEvent2(0x8000 | modifierKeys[i].virtualKey, KEY_ACTION_UP, 0, 0);
+                m_KeysDown.remove(modifierKeys[i].virtualKey);
+            }
+        }
+    }
+}
+
 // These are real Windows VK_* codes
 #ifndef VK_F1
 #define VK_F1 0x70
@@ -182,6 +244,10 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
     if (event->repeat) {
         // Ignore repeat key down events
         SDL_assert(event->state == SDL_PRESSED);
+        return;
+    }
+
+    if (handleTabletMappedKey(event)) {
         return;
     }
 

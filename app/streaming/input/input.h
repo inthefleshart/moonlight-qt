@@ -1,9 +1,16 @@
 #pragma once
 
 #include "settings/streamingpreferences.h"
+#include "settings/tabletmappingmanager.h"
 #include "backend/computermanager.h"
 
 #include "SDL_compat.h"
+
+#include <memory>
+
+#ifdef Q_OS_WIN32
+class WinPointerBridge;
+#endif
 
 struct GamepadState {
     SDL_GameController* controller;
@@ -155,6 +162,8 @@ public:
     static
     QString getUnmappedGamepads();
 
+    bool isNativePenInputEnabled() const;
+
 private:
     enum KeyCombo {
         KeyComboQuit,
@@ -188,6 +197,9 @@ private:
 
     void performSpecialKeyCombo(KeyCombo combo);
 
+    bool handleTabletMappedKey(SDL_KeyboardEvent* event);
+    void sendTabletShortcut(const TabletMappedShortcut& shortcut, bool pressed);
+
     static
     Uint32 longPressTimerCallback(Uint32 interval, void* param);
 
@@ -218,6 +230,7 @@ private:
     int m_GamepadMask;
     GamepadState m_GamepadState[MAX_GAMEPADS];
     QSet<short> m_KeysDown;
+    TabletMappedShortcut m_ActiveTabletMappings[12];
     bool m_FakeMouseCaptureActive;
     bool m_KeyboardCaptureActive;
     QString m_OldIgnoreDevices;
@@ -240,7 +253,9 @@ private:
     int m_StreamHeight;
     bool m_AbsoluteMouseMode;
     bool m_AbsoluteTouchMode;
+    StreamingPreferences::TouchPolicy m_TouchPolicy;
     bool m_DisabledTouchFeedback;
+    QSet<SDL_FingerID> m_BlockedTouchIds;
 
     SDL_TouchFingerEvent m_TouchDownEvent[MAX_FINGERS];
     SDL_TimerID m_LeftButtonReleaseTimer;
@@ -248,6 +263,10 @@ private:
     SDL_TimerID m_DragTimer;
     char m_DragButton;
     int m_NumFingersDown;
+
+#ifdef Q_OS_WIN32
+    std::unique_ptr<WinPointerBridge> m_NativePenBridge;
+#endif
 
     static const int k_ButtonMap[];
 };

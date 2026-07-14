@@ -4,6 +4,7 @@ import QtQuick.Layouts 1.2
 import QtQuick.Window 2.2
 
 import StreamingPreferences 1.0
+import TabletMappingManager 1.0
 import ComputerManager 1.0
 import SdlGamepadKeyNavigation 1.0
 import SystemProperties 1.0
@@ -1437,6 +1438,129 @@ Flickable {
                     ToolTip.timeout: 5000
                     ToolTip.visible: hovered
                     ToolTip.text: qsTr("When checked, the touchscreen acts like a trackpad. When unchecked, the touchscreen will directly control the mouse pointer.")
+                }
+
+                CheckBox {
+                    id: nativePenInputCheck
+                    hoverEnabled: true
+                    width: parent.width
+                    text: qsTr("Use native Windows pen input")
+                    font.pointSize: 12
+                    checked: StreamingPreferences.nativePenInput
+                    onCheckedChanged: StreamingPreferences.nativePenInput = checked
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 10000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Captures Windows pointer messages directly so pressure, hover, eraser, barrel button, and tilt can be sent to a compatible host. Restart the stream after changing this option.")
+                }
+
+                Row {
+                    spacing: 8
+                    width: parent.width
+
+                    Label {
+                        text: qsTr("Pen and touch interaction")
+                        font.pointSize: 12
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    AutoResizingComboBox {
+                        id: touchPolicyCombo
+                        textRole: "text"
+                        model: ListModel {
+                            id: touchPolicyModel
+                            ListElement { text: qsTr("Windows default"); value: StreamingPreferences.TOUCH_WINDOWS_DEFAULT }
+                            ListElement { text: qsTr("Disable touch while pen is in range"); value: StreamingPreferences.TOUCH_DISABLE_WHILE_PEN_IN_RANGE }
+                            ListElement { text: qsTr("Always forward touch"); value: StreamingPreferences.TOUCH_ALWAYS_FORWARD }
+                        }
+
+                        Component.onCompleted: {
+                            for (var i = 0; i < touchPolicyModel.count; ++i) {
+                                if (touchPolicyModel.get(i).value === StreamingPreferences.touchPolicy) {
+                                    currentIndex = i
+                                    break
+                                }
+                            }
+                        }
+
+                        onActivated: StreamingPreferences.touchPolicy = touchPolicyModel.get(currentIndex).value
+
+                        ToolTip.delay: 1000
+                        ToolTip.timeout: 10000
+                        ToolTip.visible: hovered
+                        ToolTip.text: qsTr("Controls whether finger touch is forwarded while a pen is near the display. Windows default preserves the tablet driver's palm-rejection behavior.")
+                    }
+                }
+
+                CheckBox {
+                    id: inputDiagnosticsCheck
+                    hoverEnabled: true
+                    width: parent.width
+                    text: qsTr("Enable privacy-safe pen diagnostics")
+                    font.pointSize: 12
+                    checked: StreamingPreferences.inputDiagnostics
+                    onCheckedChanged: StreamingPreferences.inputDiagnostics = checked
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 10000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Reports only aggregate pen sample and drop counts. It never records typed keys, application names, network addresses, file paths, or device serial numbers.")
+                }
+
+                Label {
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    text: qsTr("Tablet QuickKeys: assign the hardware buttons to F13 through F24 in the tablet control panel, then optionally remap each slot below. Empty slots pass through unchanged.")
+                }
+
+                AutoResizingComboBox {
+                    id: tabletProfileCombo
+                    textRole: "modelData"
+                    model: TabletMappingManager.profiles
+                    Component.onCompleted: currentIndex = Math.max(0, TabletMappingManager.profiles.indexOf(TabletMappingManager.activeProfile))
+                    onActivated: TabletMappingManager.activeProfile = TabletMappingManager.profiles[currentIndex]
+                }
+
+                Repeater {
+                    model: 12
+                    Row {
+                        spacing: 8
+                        width: inputSettingsGroupBox.width - 30
+
+                        Label {
+                            width: 125
+                            text: qsTr("QuickKey %1 (F%2)").arg(index + 1).arg(index + 13)
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        TextField {
+                            width: parent.width - 140
+                            placeholderText: qsTr("Pass through")
+                            text: TabletMappingManager.bindings[index]
+                            onEditingFinished: {
+                                if (!TabletMappingManager.setBinding(index, text)) {
+                                    text = TabletMappingManager.binding(index)
+                                }
+                            }
+                            ToolTip.delay: 1000
+                            ToolTip.timeout: 10000
+                            ToolTip.visible: hovered
+                            ToolTip.text: qsTr("Enter one shortcut such as Ctrl+Z, Shift+F5, or B. Supported targets include letters, numbers, F1-F24, arrows, navigation keys, Space, Tab, Enter, Escape, Backspace, Insert, and Delete.")
+                        }
+                    }
+                }
+
+                Label {
+                    width: parent.width
+                    color: "orange"
+                    visible: TabletMappingManager.duplicateBindings
+                    text: qsTr("Two or more QuickKeys use the same destination shortcut.")
+                }
+
+                Button {
+                    text: qsTr("Reset QuickKey profile")
+                    onClicked: TabletMappingManager.resetActiveProfile()
                 }
 
                 CheckBox {

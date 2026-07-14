@@ -18,6 +18,9 @@ using Microsoft::WRL::ComPtr;
 // Standard DXVA GUIDs for HEVC RExt profiles (redefined for compatibility with pre-24H2 SDKs)
 DEFINE_GUID(k_D3D11_DECODER_PROFILE_HEVC_VLD_MAIN_444,   0x4008018f, 0xf537, 0x4b36, 0x98, 0xcf, 0x61, 0xaf, 0x8a, 0x2c, 0x1a, 0x33);
 DEFINE_GUID(k_D3D11_DECODER_PROFILE_HEVC_VLD_MAIN10_444, 0x0dabeffa, 0x4458, 0x4602, 0xbc, 0x03, 0x07, 0x95, 0x65, 0x9d, 0x61, 0x7c);
+// Standard AV1 decoder GUIDs, redefined under local names for Windows 10 SDK compatibility.
+DEFINE_GUID(k_D3D11_DECODER_PROFILE_AV1_VLD_PROFILE0, 0xb8be4ccb, 0xcf53, 0x46ba, 0x8d, 0x59, 0xd6, 0xb8, 0xa6, 0xda, 0x5d, 0x2a);
+DEFINE_GUID(k_D3D11_DECODER_PROFILE_AV1_VLD_PROFILE1, 0x6936ff0f, 0x45b1, 0x4163, 0x9c, 0xc1, 0x64, 0x6e, 0xf6, 0x94, 0x61, 0x08);
 
 typedef struct _VERTEX
 {
@@ -1393,7 +1396,7 @@ bool D3D11VARenderer::checkDecoderSupport(IDXGIAdapter* adapter)
         break;
 
     case VIDEO_FORMAT_AV1_MAIN8:
-        if (FAILED(videoDevice->CheckVideoDecoderFormat(&D3D11_DECODER_PROFILE_AV1_VLD_PROFILE0, DXGI_FORMAT_NV12, &supported))) {
+        if (FAILED(videoDevice->CheckVideoDecoderFormat(&k_D3D11_DECODER_PROFILE_AV1_VLD_PROFILE0, DXGI_FORMAT_NV12, &supported))) {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                          "GPU doesn't support AV1 decoding");
             return false;
@@ -1406,7 +1409,7 @@ bool D3D11VARenderer::checkDecoderSupport(IDXGIAdapter* adapter)
         break;
 
     case VIDEO_FORMAT_AV1_MAIN10:
-        if (FAILED(videoDevice->CheckVideoDecoderFormat(&D3D11_DECODER_PROFILE_AV1_VLD_PROFILE0, DXGI_FORMAT_P010, &supported))) {
+        if (FAILED(videoDevice->CheckVideoDecoderFormat(&k_D3D11_DECODER_PROFILE_AV1_VLD_PROFILE0, DXGI_FORMAT_P010, &supported))) {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                          "GPU doesn't support AV1 Main 10-bit decoding");
             return false;
@@ -1419,7 +1422,7 @@ bool D3D11VARenderer::checkDecoderSupport(IDXGIAdapter* adapter)
         break;
 
     case VIDEO_FORMAT_AV1_HIGH8_444:
-        if (FAILED(videoDevice->CheckVideoDecoderFormat(&D3D11_DECODER_PROFILE_AV1_VLD_PROFILE1, DXGI_FORMAT_AYUV, &supported))) {
+        if (FAILED(videoDevice->CheckVideoDecoderFormat(&k_D3D11_DECODER_PROFILE_AV1_VLD_PROFILE1, DXGI_FORMAT_AYUV, &supported))) {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                          "GPU doesn't support AV1 High 444 8-bit decoding");
             return false;
@@ -1432,7 +1435,7 @@ bool D3D11VARenderer::checkDecoderSupport(IDXGIAdapter* adapter)
         break;
 
     case VIDEO_FORMAT_AV1_HIGH10_444:
-        if (FAILED(videoDevice->CheckVideoDecoderFormat(&D3D11_DECODER_PROFILE_AV1_VLD_PROFILE1, DXGI_FORMAT_Y410, &supported))) {
+        if (FAILED(videoDevice->CheckVideoDecoderFormat(&k_D3D11_DECODER_PROFILE_AV1_VLD_PROFILE1, DXGI_FORMAT_Y410, &supported))) {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                          "GPU doesn't support AV1 High 444 10-bit decoding");
             return false;

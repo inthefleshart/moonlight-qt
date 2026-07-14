@@ -9,8 +9,14 @@
 #include <QDir>
 #include <QGuiApplication>
 
+#ifdef Q_OS_WIN32
+#include "winpointer.h"
+#include <SDL_syswm.h>
+#endif
+
 SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, int streamHeight)
-    : m_MultiController(prefs.multiController),
+    : m_Window(nullptr),
+      m_MultiController(prefs.multiController),
       m_GamepadMouse(prefs.gamepadMouse),
       m_SwapMouseButtons(prefs.swapMouseButtons),
       m_ReverseScrollDirection(prefs.reverseScrollDirection),
@@ -28,6 +34,7 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_StreamHeight(streamHeight),
       m_AbsoluteMouseMode(prefs.absoluteMouseMode),
       m_AbsoluteTouchMode(prefs.absoluteTouchMode),
+      m_TouchPolicy(prefs.touchPolicy),
       m_DisabledTouchFeedback(false),
       m_LeftButtonReleaseTimer(0),
       m_RightButtonReleaseTimer(0),
@@ -35,6 +42,12 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_DragButton(0),
       m_NumFingersDown(0)
 {
+#ifdef Q_OS_WIN32
+    if (prefs.nativePenInput) {
+        m_NativePenBridge = std::make_unique<WinPointerBridge>(streamWidth, streamHeight,
+                                                               prefs.inputDiagnostics);
+    }
+#endif
     // System keys are always captured when running without a DE
     if (!WMUtils::isRunningDesktopEnvironment()) {
         m_CaptureSystemKeysMode = StreamingPreferences::CSK_ALWAYS;
@@ -201,6 +214,7 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
     SDL_zero(m_LastTouchDownEvent);
     SDL_zero(m_LastTouchUpEvent);
     SDL_zero(m_TouchDownEvent);
+    SDL_zero(m_ActiveTabletMappings);
 }
 
 SdlInputHandler::~SdlInputHandler()
@@ -255,6 +269,27 @@ SdlInputHandler::~SdlInputHandler()
 void SdlInputHandler::setWindow(SDL_Window *window)
 {
     m_Window = window;
+
+#ifdef Q_OS_WIN32
+    if (m_NativePenBridge) {
+        SDL_SysWMinfo info{};
+        SDL_VERSION(&info.version);
+        if (window && SDL_GetWindowWMInfo(window, &info) && info.subsystem == SDL_SYSWM_WINDOWS) {
+            m_NativePenBridge->setWindow(info.info.win.window);
+        } else {
+            m_NativePenBridge->setWindow(nullptr);
+        }
+    }
+#endif
+}
+
+bool SdlInputHandler::isNativePenInputEnabled() const
+{
+#ifdef Q_OS_WIN32
+    return m_NativePenBridge != nullptr;
+#else
+    return false;
+#endif
 }
 
 void SdlInputHandler::raiseAllKeys()
@@ -296,6 +331,11 @@ void SdlInputHandler::notifyMouseLeave()
 
 void SdlInputHandler::notifyFocusLost()
 {
+#ifdef Q_OS_WIN32
+    if (m_NativePenBridge) {
+        m_NativePenBridge->cancelActivePen();
+    }
+#endif
     // Release mouse cursor when another window is activated (e.g. by using ALT+TAB).
     // This lets user to interact with our window's title bar and with the buttons in it.
     // Doing this while the window is full-screen breaks the transition out of FS
@@ -430,6 +470,23 @@ void SdlInputHandler::setCaptureActive(bool active)
 
 void SdlInputHandler::handleTouchFingerEvent(SDL_TouchFingerEvent* event)
 {
+#ifdef Q_OS_WIN32
+    if (m_TouchPolicy == StreamingPreferences::TOUCH_DISABLE_WHILE_PEN_IN_RANGE &&
+            m_NativePenBridge) {
+        if (event->type == SDL_FINGERDOWN && m_NativePenBridge->isPenInRange()) {
+            m_BlockedTouchIds.insert(event->fingerId);
+            return;
+        }
+
+        if (m_BlockedTouchIds.contains(event->fingerId)) {
+            if (event->type == SDL_FINGERUP) {
+                m_BlockedTouchIds.remove(event->fingerId);
+            }
+            return;
+        }
+    }
+#endif
+
 #if SDL_VERSION_ATLEAST(2, 0, 10)
     if (SDL_GetTouchDeviceType(event->touchId) != SDL_TOUCH_DEVICE_DIRECT) {
         // Ignore anything that isn't a touchscreen. We may get callbacks

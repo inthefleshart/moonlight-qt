@@ -108,6 +108,14 @@ public:
     };
     Q_ENUM(CaptureSysKeysMode);
 
+    enum TouchPolicy
+    {
+        TOUCH_WINDOWS_DEFAULT,
+        TOUCH_DISABLE_WHILE_PEN_IN_RANGE,
+        TOUCH_ALWAYS_FORWARD,
+    };
+    Q_ENUM(TouchPolicy);
+
     Q_PROPERTY(int width MEMBER width NOTIFY displayModeChanged)
     Q_PROPERTY(int height MEMBER height NOTIFY displayModeChanged)
     Q_PROPERTY(int fps MEMBER fps NOTIFY displayModeChanged)
@@ -122,6 +130,9 @@ public:
     Q_PROPERTY(bool quitAppAfter MEMBER quitAppAfter NOTIFY quitAppAfterChanged)
     Q_PROPERTY(bool absoluteMouseMode MEMBER absoluteMouseMode NOTIFY absoluteMouseModeChanged)
     Q_PROPERTY(bool absoluteTouchMode MEMBER absoluteTouchMode NOTIFY absoluteTouchModeChanged)
+    Q_PROPERTY(bool nativePenInput MEMBER nativePenInput NOTIFY nativePenInputChanged)
+    Q_PROPERTY(bool inputDiagnostics MEMBER inputDiagnostics NOTIFY inputDiagnosticsChanged)
+    Q_PROPERTY(TouchPolicy touchPolicy MEMBER touchPolicy NOTIFY touchPolicyChanged)
     Q_PROPERTY(bool framePacing MEMBER framePacing NOTIFY framePacingChanged)
     Q_PROPERTY(bool connectionWarnings MEMBER connectionWarnings NOTIFY connectionWarningsChanged)
     Q_PROPERTY(bool configurationWarnings MEMBER configurationWarnings NOTIFY configurationWarningsChanged)
@@ -163,6 +174,8 @@ public:
     bool quitAppAfter;
     bool absoluteMouseMode;
     bool absoluteTouchMode;
+    bool nativePenInput;
+    bool inputDiagnostics;
     bool framePacing;
     bool connectionWarnings;
     bool configurationWarnings;
@@ -187,6 +200,7 @@ public:
     UIDisplayMode uiDisplayMode;
     Language language;
     CaptureSysKeysMode captureSysKeysMode;
+    TouchPolicy touchPolicy;
 
 signals:
     void displayModeChanged();
@@ -202,6 +216,9 @@ signals:
     void quitAppAfterChanged();
     void absoluteMouseModeChanged();
     void absoluteTouchModeChanged();
+    void nativePenInputChanged();
+    void inputDiagnosticsChanged();
+    void touchPolicyChanged();
     void audioConfigChanged();
     void videoCodecConfigChanged();
     void enableHdrChanged();

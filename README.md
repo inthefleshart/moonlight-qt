@@ -1,5 +1,7 @@
 # Moonlight PC
 
+> **Fork feature:** this branch adds native Windows pen pressure, hover, eraser, barrel-button, tilt, touch policy, and F13-F24 QuickKey profiles for pen-display clients. See [Native Windows Pen and Touch](docs/wacom-remote.md) for build and setup instructions. Local packages are experimental and are not official Moonlight releases.
+
 [Moonlight PC](https://moonlight-stream.org) is an open source PC client for NVIDIA GameStream and [Sunshine](https://github.com/LizardByte/Sunshine).
 
 Moonlight also has mobile versions for [Android](https://github.com/moonlight-stream/moonlight-android) and [iOS](https://github.com/moonlight-stream/moonlight-ios).

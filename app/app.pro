@@ -185,7 +185,10 @@ SOURCES += \
     settings/compatfetcher.cpp \
     settings/mappingfetcher.cpp \
     settings/streamingpreferences.cpp \
+    settings/tabletmappingmanager.cpp \
     streaming/input/abstouch.cpp \
+    streaming/input/inputgeometry.cpp \
+    streaming/input/penconversion.cpp \
     streaming/input/gamepad.cpp \
     streaming/input/input.cpp \
     streaming/input/keyboard.cpp \
@@ -227,7 +230,10 @@ HEADERS += \
     cli/quitstream.h \
     cli/startstream.h \
     settings/streamingpreferences.h \
+    settings/tabletmappingmanager.h \
     streaming/input/input.h \
+    streaming/input/inputgeometry.h \
+    streaming/input/penconversion.h \
     streaming/session.h \
     streaming/audio/renderers/renderer.h \
     streaming/audio/renderers/sdl.h \
@@ -242,6 +248,11 @@ HEADERS += \
     gui/sdlgamepadkeynavigation.h \
     streaming/video/overlaymanager.h \
     backend/systemproperties.h
+
+win32 {
+    SOURCES += streaming/input/winpointer.cpp
+    HEADERS += streaming/input/winpointer.h
+}
 
 # Platform-specific renderers and decoders
 ffmpeg {

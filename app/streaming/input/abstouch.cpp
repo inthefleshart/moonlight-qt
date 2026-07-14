@@ -4,6 +4,7 @@
 #include "SDL_compat.h"
 #include <SDL_syswm.h>
 #include "streaming/streamutils.h"
+#include "inputgeometry.h"
 
 #include <QtMath>
 
@@ -74,10 +75,10 @@ void SdlInputHandler::handleAbsoluteFingerEvent(SDL_TouchFingerEvent* event)
     dst.w = windowWidth;
     dst.h = windowHeight;
 
-    // Scale window-relative events to be video-relative and clamp to video region
-    StreamUtils::scaleSourceToDestinationSurface(&src, &dst);
-    float vidrelx = qMin(qMax((int)(event->x * windowWidth), dst.x), dst.x + dst.w) - dst.x;
-    float vidrely = qMin(qMax((int)(event->y * windowHeight), dst.y), dst.y + dst.h) - dst.y;
+    // Scale window-relative events to be video-relative and clamp to video region.
+    const auto mappedPoint = InputGeometry::mapClientPoint(
+        static_cast<int>(event->x * windowWidth), static_cast<int>(event->y * windowHeight),
+        windowWidth, windowHeight, m_StreamWidth, m_StreamHeight, true);
 
     uint8_t eventType;
     switch (event->type) {
@@ -127,13 +128,19 @@ void SdlInputHandler::handleAbsoluteFingerEvent(SDL_TouchFingerEvent* event)
         }
 
         if (isPen) {
-            LiSendPenEvent(eventType, LI_TOOL_TYPE_PEN, 0, vidrelx / dst.w, vidrely / dst.h, event->pressure,
+            // WM_POINTER carries pressure, buttons, eraser, and tilt. Suppress SDL's
+            // lossy duplicate only when the native bridge is active.
+            if (isNativePenInputEnabled()) {
+                return;
+            }
+
+            LiSendPenEvent(eventType, LI_TOOL_TYPE_PEN, 0, mappedPoint.x, mappedPoint.y, event->pressure,
                            0.0f, 0.0f, LI_ROT_UNKNOWN, LI_TILT_UNKNOWN);
         }
         else
 #endif
         {
-            LiSendTouchEvent(eventType, pointerId, vidrelx / dst.w, vidrely / dst.h, event->pressure,
+            LiSendTouchEvent(eventType, pointerId, mappedPoint.x, mappedPoint.y, event->pressure,
                              0.0f, 0.0f, LI_ROT_UNKNOWN);
         }
 
