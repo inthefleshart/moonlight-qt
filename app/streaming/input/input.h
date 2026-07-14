@@ -198,7 +198,15 @@ private:
     void performSpecialKeyCombo(KeyCombo combo);
 
     bool handleTabletMappedKey(SDL_KeyboardEvent* event);
-    void sendTabletShortcut(const TabletMappedShortcut& shortcut, bool pressed);
+    void executeTabletAction(int slot, const TabletControlAction& action, bool pressed);
+    void sendTabletKeyStroke(const TabletKeyStroke& stroke, bool pressed);
+    void releaseTabletActions();
+    void releasePenGesture();
+#ifdef Q_OS_WIN32
+    static bool nativePenGestureCallback(void* context, uint8_t eventType, float x, float y,
+                                         bool inContact);
+    bool handleNativePenGesture(uint8_t eventType, float x, float y, bool inContact);
+#endif
 
     static
     Uint32 longPressTimerCallback(Uint32 interval, void* param);
@@ -230,7 +238,13 @@ private:
     int m_GamepadMask;
     GamepadState m_GamepadState[MAX_GAMEPADS];
     QSet<short> m_KeysDown;
-    TabletMappedShortcut m_ActiveTabletMappings[12];
+    TabletControlAction m_ActiveTabletMappings[TabletMappingManager::SlotCount];
+    bool m_TabletSourceActive[TabletMappingManager::SlotCount] = {};
+    int m_ActivePenGestureSlot;
+    bool m_PenGestureContactActive;
+    bool m_PenGestureKeysDown;
+    bool m_TouchForwardingEnabled;
+    bool m_RuntimeDiagnosticsEnabled;
     bool m_FakeMouseCaptureActive;
     bool m_KeyboardCaptureActive;
     QString m_OldIgnoreDevices;

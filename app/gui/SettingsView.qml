@@ -1440,6 +1440,40 @@ Flickable {
                     ToolTip.text: qsTr("When checked, the touchscreen acts like a trackpad. When unchecked, the touchscreen will directly control the mouse pointer.")
                 }
 
+                Row {
+                    spacing: 20
+
+                    Label {
+                        text: qsTr("Pen cursor visibility")
+                        font.pointSize: 12
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    AutoResizingComboBox {
+                        id: penCursorPolicyCombo
+                        textRole: "text"
+                        model: ListModel {
+                            id: penCursorPolicyModel
+                            ListElement { text: qsTr("Automatic"); value: StreamingPreferences.PEN_CURSOR_AUTOMATIC }
+                            ListElement { text: qsTr("Always visible"); value: StreamingPreferences.PEN_CURSOR_ALWAYS_VISIBLE }
+                            ListElement { text: qsTr("Hidden while pen is in range"); value: StreamingPreferences.PEN_CURSOR_HIDE_IN_RANGE }
+                        }
+                        Component.onCompleted: {
+                            for (var i = 0; i < penCursorPolicyModel.count; ++i) {
+                                if (penCursorPolicyModel.get(i).value === StreamingPreferences.penCursorPolicy) {
+                                    currentIndex = i
+                                    break
+                                }
+                            }
+                        }
+                        onActivated: StreamingPreferences.penCursorPolicy = penCursorPolicyModel.get(currentIndex).value
+                        ToolTip.delay: 1000
+                        ToolTip.timeout: 10000
+                        ToolTip.visible: hovered
+                        ToolTip.text: qsTr("Automatic hides only Moonlight's local system cursor while native pen input is active. The remote application's brush cursor is unaffected.")
+                    }
+                }
+
                 CheckBox {
                     id: nativePenInputCheck
                     hoverEnabled: true
@@ -1511,7 +1545,7 @@ Flickable {
                 Label {
                     width: parent.width
                     wrapMode: Text.WordWrap
-                    text: qsTr("Tablet QuickKeys: assign the hardware buttons to F13 through F24 in the tablet control panel, then optionally remap each slot below. Empty slots pass through unchanged.")
+                    text: qsTr("Tablet QuickKeys: the first 12 source controls remain F13 through F24 for compatibility. Learn the remaining controls, choose a shipped preset, or record a shortcut or pen-drag gesture. No shortcut syntax needs to be typed.")
                 }
 
                 AutoResizingComboBox {
@@ -1522,32 +1556,89 @@ Flickable {
                     onActivated: TabletMappingManager.activeProfile = TabletMappingManager.profiles[currentIndex]
                 }
 
+                Connections {
+                    target: TabletMappingManager
+                    function onActiveProfileChanged() {
+                        tabletProfileCombo.currentIndex = Math.max(0, TabletMappingManager.profiles.indexOf(TabletMappingManager.activeProfile))
+                    }
+                }
+
                 Repeater {
-                    model: 12
-                    Row {
-                        spacing: 8
+                    model: TabletMappingManager.bindingsModel
+                    Column {
+                        spacing: 4
                         width: inputSettingsGroupBox.width - 30
 
-                        Label {
-                            width: 125
-                            text: qsTr("QuickKey %1 (F%2)").arg(index + 1).arg(index + 13)
-                            anchors.verticalCenter: parent.verticalCenter
+                        Row {
+                            spacing: 8
+                            Label {
+                                width: 105
+                                text: qsTr("QuickKey %1").arg(slot + 1)
+                                font.bold: true
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                            Button {
+                                text: qsTr("Source: %1").arg(sourceText)
+                                onClicked: {
+                                    keyRecorder.recordSlot = slot
+                                    keyRecorder.recordSource = true
+                                    keyRecorder.open()
+                                }
+                                ToolTip.visible: hovered
+                                ToolTip.text: qsTr("Press the physical QuickKey's unique keyboard chord. Escape cancels; Backspace clears the learned source.")
+                            }
+                            Label {
+                                width: parent.width - 330
+                                text: actionText + (setupRequired ? qsTr(" (setup required)") : "")
+                                color: setupRequired ? "orange" : palette.text
+                                elide: Text.ElideRight
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
                         }
 
-                        TextField {
-                            width: parent.width - 140
-                            placeholderText: qsTr("Pass through")
-                            text: TabletMappingManager.bindings[index]
-                            onEditingFinished: {
-                                if (!TabletMappingManager.setBinding(index, text)) {
-                                    text = TabletMappingManager.binding(index)
+                        Row {
+                            spacing: 6
+                            Item { width: 105; height: 1 }
+                            Button {
+                                text: qsTr("Record shortcut")
+                                onClicked: {
+                                    keyRecorder.recordSlot = slot
+                                    keyRecorder.recordSource = false
+                                    keyRecorder.open()
                                 }
                             }
-                            ToolTip.delay: 1000
-                            ToolTip.timeout: 10000
-                            ToolTip.visible: hovered
-                            ToolTip.text: qsTr("Enter one shortcut such as Ctrl+Z, Shift+F5, or B. Supported targets include letters, numbers, F1-F24, arrows, navigation keys, Space, Tab, Enter, Escape, Backspace, Insert, and Delete.")
+                            Button {
+                                text: qsTr("Pen gesture")
+                                onClicked: {
+                                    gestureEditor.editSlot = slot
+                                    gestureEditor.open()
+                                }
+                            }
+                            Button {
+                                text: qsTr("Sequence")
+                                onClicked: {
+                                    sequenceRecorder.editSlot = slot
+                                    sequenceRecorder.open()
+                                }
+                            }
+                            Button {
+                                text: qsTr("Common actions")
+                                onClicked: {
+                                    actionChooser.editSlot = slot
+                                    actionChooser.open()
+                                }
+                            }
+                            Button { text: qsTr("Reset"); onClicked: TabletMappingManager.resetBinding(slot) }
+                            Button { text: qsTr("Clear"); onClicked: TabletMappingManager.clearBinding(slot) }
+                            Label {
+                                visible: userModified
+                                text: qsTr("Custom")
+                                color: "orange"
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
                         }
+
+                        Rectangle { width: parent.width; height: 1; color: palette.mid }
                     }
                 }
 
@@ -1561,6 +1652,243 @@ Flickable {
                 Button {
                     text: qsTr("Reset QuickKey profile")
                     onClicked: TabletMappingManager.resetActiveProfile()
+                }
+
+                Popup {
+                    id: keyRecorder
+                    property int recordSlot: -1
+                    property bool recordSource: false
+                    property int pendingModifier: 0
+                    modal: true
+                    focus: true
+                    closePolicy: Popup.NoAutoClose
+                    anchors.centerIn: Overlay.overlay
+                    width: 440
+                    height: 190
+
+                    function isModifier(key) {
+                        return key === Qt.Key_Control || key === Qt.Key_Alt ||
+                               key === Qt.Key_Shift || key === Qt.Key_Meta
+                    }
+
+                    onOpened: {
+                        pendingModifier = 0
+                        forceActiveFocus()
+                    }
+                    Keys.onPressed: function(event) {
+                        if (event.key === Qt.Key_Escape) {
+                            close()
+                        } else if (event.key === Qt.Key_Backspace) {
+                            if (recordSource)
+                                TabletMappingManager.setSourceBinding(recordSlot, "")
+                            else
+                                TabletMappingManager.clearBinding(recordSlot)
+                            close()
+                        } else if (isModifier(event.key)) {
+                            pendingModifier = event.key
+                        } else if (TabletMappingManager.recordKey(recordSlot, event.key, event.modifiers,
+                                                                   recordSource, holdAction.checked)) {
+                            close()
+                        }
+                        event.accepted = true
+                    }
+                    Keys.onReleased: function(event) {
+                        if (pendingModifier === event.key && isModifier(event.key)) {
+                            if (TabletMappingManager.recordKey(recordSlot, event.key, event.modifiers,
+                                                               recordSource, holdAction.checked))
+                                close()
+                        }
+                        event.accepted = true
+                    }
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 18
+                        spacing: 12
+                        Label {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            text: keyRecorder.recordSource ?
+                                      qsTr("Press the unique keyboard chord produced by this physical QuickKey.") :
+                                      qsTr("Press the destination shortcut now. Modifier-only shortcuts are supported.")
+                        }
+                        CheckBox {
+                            id: holdAction
+                            visible: !keyRecorder.recordSource
+                            text: qsTr("Hold until the QuickKey is released")
+                        }
+                        Label { text: qsTr("Escape cancels. Backspace clears the current value."); color: palette.mid }
+                    }
+                }
+
+                Popup {
+                    id: gestureEditor
+                    property int editSlot: -1
+                    modal: true
+                    focus: true
+                    closePolicy: Popup.CloseOnEscape
+                    anchors.centerIn: Overlay.overlay
+                    width: 500
+                    height: 330
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 18
+                        spacing: 10
+                        Label { text: qsTr("Record a QuickKey + pen drag gesture"); font.bold: true }
+                        Label {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            text: qsTr("While the QuickKey is held, Moonlight sends the selected keys and mouse button while the pen controls absolute mouse movement.")
+                        }
+                        Row {
+                            CheckBox { id: gestureCtrl; text: "Ctrl" }
+                            CheckBox { id: gestureAlt; text: "Alt" }
+                            CheckBox { id: gestureShift; text: "Shift" }
+                            CheckBox { id: gestureMeta; text: "Win" }
+                        }
+                        Row {
+                            spacing: 10
+                            Label { text: qsTr("Additional key"); anchors.verticalCenter: parent.verticalCenter }
+                            ComboBox {
+                                id: gestureKey
+                                model: [qsTr("None"), "B", "F", "M", "Space"]
+                            }
+                        }
+                        Row {
+                            spacing: 10
+                            Label { text: qsTr("Mouse button"); anchors.verticalCenter: parent.verticalCenter }
+                            ComboBox {
+                                id: gestureMouse
+                                textRole: "text"
+                                model: ListModel {
+                                    ListElement { text: qsTr("None"); value: 0 }
+                                    ListElement { text: qsTr("Left"); value: 1 }
+                                    ListElement { text: qsTr("Middle"); value: 2 }
+                                    ListElement { text: qsTr("Right"); value: 3 }
+                                    ListElement { text: "X1"; value: 4 }
+                                    ListElement { text: "X2"; value: 5 }
+                                }
+                            }
+                        }
+                        Row {
+                            spacing: 8
+                            Button {
+                                text: qsTr("Save gesture")
+                                onClicked: {
+                                    var mods = 0
+                                    if (gestureCtrl.checked) mods |= Qt.ControlModifier
+                                    if (gestureAlt.checked) mods |= Qt.AltModifier
+                                    if (gestureShift.checked) mods |= Qt.ShiftModifier
+                                    if (gestureMeta.checked) mods |= Qt.MetaModifier
+                                    var key = 0
+                                    if (gestureKey.currentIndex === 1) key = Qt.Key_B
+                                    else if (gestureKey.currentIndex === 2) key = Qt.Key_F
+                                    else if (gestureKey.currentIndex === 3) key = Qt.Key_M
+                                    else if (gestureKey.currentIndex === 4) key = Qt.Key_Space
+                                    var label = gestureKey.currentText
+                                    if (gestureCtrl.checked) label = "Ctrl + " + label
+                                    if (gestureAlt.checked) label = "Alt + " + label
+                                    if (gestureShift.checked) label = "Shift + " + label
+                                    if (gestureMeta.checked) label = "Win + " + label
+                                    label += " + " + gestureMouse.currentText + " + Pen Drag"
+                                    if (TabletMappingManager.setPenGesture(editSlot, key, mods,
+                                            gestureMouse.model.get(gestureMouse.currentIndex).value, label))
+                                        gestureEditor.close()
+                                }
+                            }
+                            Button { text: qsTr("Cancel"); onClicked: gestureEditor.close() }
+                        }
+                    }
+                }
+
+                Popup {
+                    id: sequenceRecorder
+                    property int editSlot: -1
+                    property var recordedKeys: []
+                    modal: true
+                    focus: true
+                    closePolicy: Popup.NoAutoClose
+                    anchors.centerIn: Overlay.overlay
+                    width: 500
+                    height: 250
+                    onOpened: { recordedKeys = []; forceActiveFocus() }
+                    Keys.onPressed: function(event) {
+                        if (event.key === Qt.Key_Escape) {
+                            close()
+                        } else if (event.key === Qt.Key_Backspace) {
+                            if (recordedKeys.length > 0) recordedKeys = recordedKeys.slice(0, -1)
+                        } else if (event.key !== Qt.Key_Control && event.key !== Qt.Key_Alt &&
+                                   event.key !== Qt.Key_Shift && event.key !== Qt.Key_Meta) {
+                            var text = TabletMappingManager.recordedKeyText(event.key, event.modifiers)
+                            if (text.length > 0 && recordedKeys.length < 32) {
+                                var copy = recordedKeys.slice()
+                                copy.push(text)
+                                recordedKeys = copy
+                            }
+                        }
+                        event.accepted = true
+                    }
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 18
+                        spacing: 12
+                        Label { text: qsTr("Record an ordered key sequence"); font.bold: true }
+                        Label {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            text: recordedKeys.length ? recordedKeys.join("  →  ") : qsTr("Press keys or shortcuts in order")
+                        }
+                        Label { text: qsTr("Backspace removes the last step. Escape cancels. Maximum 32 steps.") }
+                        Row {
+                            spacing: 8
+                            Button {
+                                text: qsTr("Save sequence")
+                                enabled: recordedKeys.length > 0
+                                onClicked: {
+                                    if (TabletMappingManager.setKeySequence(sequenceRecorder.editSlot,
+                                            recordedKeys, recordedKeys.join(" → ")))
+                                        sequenceRecorder.close()
+                                }
+                            }
+                            Button { text: qsTr("Cancel"); onClicked: sequenceRecorder.close() }
+                        }
+                    }
+                }
+
+                Popup {
+                    id: actionChooser
+                    property int editSlot: -1
+                    modal: true
+                    focus: true
+                    closePolicy: Popup.CloseOnEscape
+                    anchors.centerIn: Overlay.overlay
+                    width: 460
+                    height: 210
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 18
+                        spacing: 12
+                        Label { text: qsTr("Choose a common action"); font.bold: true }
+                        ComboBox {
+                            id: commonActionCombo
+                            width: parent.width
+                            model: TabletMappingManager.actionOptions
+                            textRole: "text"
+                        }
+                        Row {
+                            spacing: 8
+                            Button {
+                                text: qsTr("Apply")
+                                onClicked: {
+                                    if (TabletMappingManager.setActionOption(actionChooser.editSlot,
+                                            commonActionCombo.model[commonActionCombo.currentIndex].id))
+                                        actionChooser.close()
+                                }
+                            }
+                            Button { text: qsTr("Cancel"); onClicked: actionChooser.close() }
+                        }
+                    }
                 }
 
                 CheckBox {

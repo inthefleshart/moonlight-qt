@@ -116,6 +116,14 @@ public:
     };
     Q_ENUM(TouchPolicy);
 
+    enum PenCursorPolicy
+    {
+        PEN_CURSOR_AUTOMATIC,
+        PEN_CURSOR_ALWAYS_VISIBLE,
+        PEN_CURSOR_HIDE_IN_RANGE,
+    };
+    Q_ENUM(PenCursorPolicy);
+
     Q_PROPERTY(int width MEMBER width NOTIFY displayModeChanged)
     Q_PROPERTY(int height MEMBER height NOTIFY displayModeChanged)
     Q_PROPERTY(int fps MEMBER fps NOTIFY displayModeChanged)
@@ -133,6 +141,7 @@ public:
     Q_PROPERTY(bool nativePenInput MEMBER nativePenInput NOTIFY nativePenInputChanged)
     Q_PROPERTY(bool inputDiagnostics MEMBER inputDiagnostics NOTIFY inputDiagnosticsChanged)
     Q_PROPERTY(TouchPolicy touchPolicy MEMBER touchPolicy NOTIFY touchPolicyChanged)
+    Q_PROPERTY(PenCursorPolicy penCursorPolicy MEMBER penCursorPolicy NOTIFY penCursorPolicyChanged)
     Q_PROPERTY(bool framePacing MEMBER framePacing NOTIFY framePacingChanged)
     Q_PROPERTY(bool connectionWarnings MEMBER connectionWarnings NOTIFY connectionWarningsChanged)
     Q_PROPERTY(bool configurationWarnings MEMBER configurationWarnings NOTIFY configurationWarningsChanged)
@@ -201,6 +210,7 @@ public:
     Language language;
     CaptureSysKeysMode captureSysKeysMode;
     TouchPolicy touchPolicy;
+    PenCursorPolicy penCursorPolicy;
 
 signals:
     void displayModeChanged();
@@ -219,6 +229,7 @@ signals:
     void nativePenInputChanged();
     void inputDiagnosticsChanged();
     void touchPolicyChanged();
+    void penCursorPolicyChanged();
     void audioConfigChanged();
     void videoCodecConfigChanged();
     void enableHdrChanged();

@@ -3,70 +3,276 @@
 #include <Limelight.h>
 #include "SDL_compat.h"
 
+#ifdef Q_OS_WIN32
+#include "winpointer.h"
+#endif
+
 #define VK_0 0x30
 #define VK_A 0x41
 
+namespace {
+quint16 virtualKeyForScancode(SDL_Scancode scancode)
+{
+    if (scancode >= SDL_SCANCODE_1 && scancode <= SDL_SCANCODE_9)
+        return static_cast<quint16>((scancode - SDL_SCANCODE_1) + 0x31);
+    if (scancode == SDL_SCANCODE_0) return 0x30;
+    if (scancode >= SDL_SCANCODE_A && scancode <= SDL_SCANCODE_Z)
+        return static_cast<quint16>((scancode - SDL_SCANCODE_A) + 0x41);
+    if (scancode >= SDL_SCANCODE_F1 && scancode <= SDL_SCANCODE_F24)
+        return static_cast<quint16>((scancode - SDL_SCANCODE_F1) + 0x70);
+    if (scancode >= SDL_SCANCODE_KP_1 && scancode <= SDL_SCANCODE_KP_9)
+        return static_cast<quint16>((scancode - SDL_SCANCODE_KP_1) + 0x61);
+    switch (scancode) {
+    case SDL_SCANCODE_KP_0: return 0x60; case SDL_SCANCODE_KP_PERIOD: return 0x6E;
+    case SDL_SCANCODE_BACKSPACE: return 0x08; case SDL_SCANCODE_TAB: return 0x09;
+    case SDL_SCANCODE_CLEAR: return 0x0C; case SDL_SCANCODE_PAUSE: return 0x13;
+    case SDL_SCANCODE_CAPSLOCK: return 0x14;
+    case SDL_SCANCODE_RETURN: case SDL_SCANCODE_KP_ENTER: return 0x0D;
+    case SDL_SCANCODE_ESCAPE: return 0x1B; case SDL_SCANCODE_SPACE: return 0x20;
+    case SDL_SCANCODE_PAGEUP: return 0x21; case SDL_SCANCODE_PAGEDOWN: return 0x22;
+    case SDL_SCANCODE_END: return 0x23; case SDL_SCANCODE_HOME: return 0x24;
+    case SDL_SCANCODE_LEFT: return 0x25; case SDL_SCANCODE_UP: return 0x26;
+    case SDL_SCANCODE_RIGHT: return 0x27; case SDL_SCANCODE_DOWN: return 0x28;
+    case SDL_SCANCODE_SELECT: return 0x29; case SDL_SCANCODE_EXECUTE: return 0x2B;
+    case SDL_SCANCODE_INSERT: return 0x2D; case SDL_SCANCODE_DELETE: return 0x2E;
+    case SDL_SCANCODE_PRINTSCREEN: return 0x2C; case SDL_SCANCODE_HELP: return 0x2F;
+    case SDL_SCANCODE_KP_MULTIPLY: return 0x6A; case SDL_SCANCODE_KP_PLUS: return 0x6B;
+    case SDL_SCANCODE_KP_COMMA: return 0x6C; case SDL_SCANCODE_KP_MINUS: return 0x6D;
+    case SDL_SCANCODE_KP_DIVIDE: return 0x6F; case SDL_SCANCODE_NUMLOCKCLEAR: return 0x90;
+    case SDL_SCANCODE_SCROLLLOCK: return 0x91;
+    case SDL_SCANCODE_LSHIFT: case SDL_SCANCODE_RSHIFT: return 0xA0;
+    case SDL_SCANCODE_LCTRL: case SDL_SCANCODE_RCTRL: return 0xA2;
+    case SDL_SCANCODE_LALT: case SDL_SCANCODE_RALT: return 0xA4;
+    case SDL_SCANCODE_LGUI: return 0x5B; case SDL_SCANCODE_RGUI: return 0x5C;
+    case SDL_SCANCODE_APPLICATION: return 0x5D;
+    case SDL_SCANCODE_AC_BACK: return 0xA6; case SDL_SCANCODE_AC_FORWARD: return 0xA7;
+    case SDL_SCANCODE_AC_REFRESH: return 0xA8; case SDL_SCANCODE_AC_STOP: return 0xA9;
+    case SDL_SCANCODE_AC_SEARCH: return 0xAA; case SDL_SCANCODE_AC_BOOKMARKS: return 0xAB;
+    case SDL_SCANCODE_AC_HOME: return 0xAC;
+    case SDL_SCANCODE_SEMICOLON: return 0xBA; case SDL_SCANCODE_EQUALS: return 0xBB;
+    case SDL_SCANCODE_COMMA: return 0xBC; case SDL_SCANCODE_MINUS: return 0xBD;
+    case SDL_SCANCODE_PERIOD: return 0xBE; case SDL_SCANCODE_SLASH: return 0xBF;
+    case SDL_SCANCODE_GRAVE: return 0xC0; case SDL_SCANCODE_LEFTBRACKET: return 0xDB;
+    case SDL_SCANCODE_BACKSLASH: return 0xDC; case SDL_SCANCODE_RIGHTBRACKET: return 0xDD;
+    case SDL_SCANCODE_APOSTROPHE: case SDL_SCANCODE_INTERNATIONAL3: return 0xDE;
+    case SDL_SCANCODE_NONUSBACKSLASH: case SDL_SCANCODE_INTERNATIONAL1: return 0xE2;
+    case SDL_SCANCODE_LANG1: return 0x1C; case SDL_SCANCODE_LANG2: return 0x1D;
+    default: return 0;
+    }
+}
+
+char modifierMask(const TabletKeyStroke& stroke)
+{
+    return (stroke.control ? MODIFIER_CTRL : 0) | (stroke.alt ? MODIFIER_ALT : 0) |
+           (stroke.shift ? MODIFIER_SHIFT : 0) | (stroke.meta ? MODIFIER_META : 0);
+}
+}
+
 bool SdlInputHandler::handleTabletMappedKey(SDL_KeyboardEvent* event)
 {
-    if (event->keysym.scancode < SDL_SCANCODE_F13 || event->keysym.scancode > SDL_SCANCODE_F24) {
-        return false;
-    }
+    const quint16 virtualKey = virtualKeyForScancode(event->keysym.scancode);
+    if (!virtualKey) return false;
 
-    const int slot = event->keysym.scancode - SDL_SCANCODE_F13;
-    if (event->state == SDL_PRESSED) {
-        const TabletMappedShortcut shortcut = TabletMappingManager::get()->mappedShortcut(slot);
-        if (!shortcut.valid) {
-            return false;
+    if (event->state == SDL_RELEASED) {
+        for (int slot = 0; slot < TabletMappingManager::SlotCount; ++slot) {
+            const auto source = TabletMappingManager::get()->sourceForSlot(slot);
+            if (source.valid && source.chord.virtualKey == virtualKey && m_TabletSourceActive[slot]) {
+                executeTabletAction(slot, m_ActiveTabletMappings[slot], false);
+                m_ActiveTabletMappings[slot] = {};
+                m_TabletSourceActive[slot] = false;
+                return true;
+            }
         }
-        m_ActiveTabletMappings[slot] = shortcut;
-        sendTabletShortcut(shortcut, true);
-        return true;
-    }
-
-    const TabletMappedShortcut shortcut = m_ActiveTabletMappings[slot];
-    if (!shortcut.valid) {
         return false;
     }
-    sendTabletShortcut(shortcut, false);
-    m_ActiveTabletMappings[slot] = {};
+
+    const bool control = (event->keysym.mod & KMOD_CTRL) != 0;
+    const bool alt = (event->keysym.mod & KMOD_ALT) != 0;
+    const bool shift = (event->keysym.mod & KMOD_SHIFT) != 0;
+    const bool meta = (event->keysym.mod & KMOD_GUI) != 0;
+    const int slot = TabletMappingManager::get()->slotForSource(virtualKey, control, alt, shift, meta);
+    if (slot < 0) return false;
+
+    const auto action = TabletMappingManager::get()->actionForSlot(slot);
+    if (action.kind == TabletActionKind::PassThrough) return false;
+    if (event->repeat) return true;
+    m_ActiveTabletMappings[slot] = action;
+    m_TabletSourceActive[slot] = true;
+    executeTabletAction(slot, action, true);
     return true;
 }
 
-void SdlInputHandler::sendTabletShortcut(const TabletMappedShortcut& shortcut, bool pressed)
+void SdlInputHandler::executeTabletAction(int slot, const TabletControlAction& action, bool pressed)
 {
-    const char modifiers = (shortcut.control ? MODIFIER_CTRL : 0) |
-                           (shortcut.alt ? MODIFIER_ALT : 0) |
-                           (shortcut.shift ? MODIFIER_SHIFT : 0) |
-                           (shortcut.meta ? MODIFIER_META : 0);
-
-    struct ModifierKey { bool enabled; short virtualKey; };
-    const ModifierKey modifierKeys[] = {
-        {shortcut.control, 0xA2},
-        {shortcut.alt, 0xA4},
-        {shortcut.shift, 0xA0},
-        {shortcut.meta, 0x5B},
-    };
-
-    if (pressed) {
-        for (const auto& modifier : modifierKeys) {
-            if (modifier.enabled) {
-                LiSendKeyboardEvent2(0x8000 | modifier.virtualKey, KEY_ACTION_DOWN, modifiers, 0);
-                m_KeysDown.insert(modifier.virtualKey);
+    switch (action.kind) {
+    case TabletActionKind::Disabled:
+    case TabletActionKind::PassThrough:
+        return;
+    case TabletActionKind::KeyChord:
+    case TabletActionKind::WacomRadialChord:
+        if (!action.chord.virtualKey) return;
+        if (action.activation == TabletActivation::Hold) {
+            sendTabletKeyStroke(action.chord, pressed);
+        } else if (pressed) {
+            sendTabletKeyStroke(action.chord, true);
+            sendTabletKeyStroke(action.chord, false);
+        }
+        return;
+    case TabletActionKind::KeySequence:
+        if (pressed) {
+            for (const auto& stroke : action.sequence) {
+                sendTabletKeyStroke(stroke, true);
+                sendTabletKeyStroke(stroke, false);
             }
         }
-        LiSendKeyboardEvent2(0x8000 | shortcut.virtualKey, KEY_ACTION_DOWN, modifiers, 0);
-        m_KeysDown.insert(shortcut.virtualKey);
+        return;
+    case TabletActionKind::MouseWheel:
+        if (pressed && action.wheelDelta) LiSendHighResScrollEvent(static_cast<short>(action.wheelDelta));
+        return;
+    case TabletActionKind::LocalAction:
+        if (!pressed) return;
+        switch (action.localAction) {
+        case TabletLocalAction::ToggleTouch:
+            m_TouchForwardingEnabled = !m_TouchForwardingEnabled;
+            if (!m_TouchForwardingEnabled) {
+                LiSendTouchEvent(LI_TOUCH_EVENT_CANCEL_ALL, 0, 0, 0, 0, 0, 0, 0);
+                m_BlockedTouchIds.clear();
+            }
+            break;
+        case TabletLocalAction::CycleTouchPolicy:
+            m_TouchPolicy = static_cast<StreamingPreferences::TouchPolicy>(
+                (static_cast<int>(m_TouchPolicy) + 1) % 3);
+            break;
+        case TabletLocalAction::ToggleDiagnostics:
+            m_RuntimeDiagnosticsEnabled = !m_RuntimeDiagnosticsEnabled;
+#ifdef Q_OS_WIN32
+            if (m_NativePenBridge) m_NativePenBridge->setDiagnosticsEnabled(m_RuntimeDiagnosticsEnabled);
+#endif
+            break;
+        case TabletLocalAction::ResetStuckInput:
+            releaseTabletActions();
+            raiseAllKeys();
+            break;
+        default: break;
+        }
+        return;
+    case TabletActionKind::PenGesture:
+        if (pressed) {
+            if (m_ActivePenGestureSlot >= 0 && m_ActivePenGestureSlot != slot) return;
+#ifdef Q_OS_WIN32
+            if (m_NativePenBridge && m_NativePenBridge->isPenInContact())
+                m_NativePenBridge->cancelActivePen();
+#endif
+            m_ActivePenGestureSlot = slot;
+            m_PenGestureContactActive = false;
+            m_PenGestureKeysDown = false;
+            if (action.mouseButton == TabletMouseNone) {
+                sendTabletKeyStroke(action.chord, true);
+                m_PenGestureKeysDown = true;
+            }
+        } else if (m_ActivePenGestureSlot == slot) {
+            releasePenGesture();
+        }
+        return;
+    }
+}
+
+void SdlInputHandler::sendTabletKeyStroke(const TabletKeyStroke& stroke, bool pressed)
+{
+    const char modifiers = modifierMask(stroke);
+    const struct { bool enabled; short key; } modifierKeys[] = {
+        {stroke.control, 0xA2}, {stroke.alt, 0xA4}, {stroke.shift, 0xA0}, {stroke.meta, 0x5B},
+    };
+    if (pressed) {
+        for (const auto& modifier : modifierKeys) {
+            if (modifier.enabled && modifier.key != stroke.virtualKey) {
+                LiSendKeyboardEvent2(0x8000 | modifier.key, KEY_ACTION_DOWN, modifiers, 0);
+                m_KeysDown.insert(modifier.key);
+            }
+        }
+        if (stroke.virtualKey) {
+            LiSendKeyboardEvent2(0x8000 | stroke.virtualKey, KEY_ACTION_DOWN, modifiers, 0);
+            m_KeysDown.insert(stroke.virtualKey);
+        }
     } else {
-        LiSendKeyboardEvent2(0x8000 | shortcut.virtualKey, KEY_ACTION_UP, modifiers, 0);
-        m_KeysDown.remove(shortcut.virtualKey);
+        if (stroke.virtualKey) {
+            LiSendKeyboardEvent2(0x8000 | stroke.virtualKey, KEY_ACTION_UP, modifiers, 0);
+            m_KeysDown.remove(stroke.virtualKey);
+        }
         for (int i = 3; i >= 0; --i) {
-            if (modifierKeys[i].enabled) {
-                LiSendKeyboardEvent2(0x8000 | modifierKeys[i].virtualKey, KEY_ACTION_UP, 0, 0);
-                m_KeysDown.remove(modifierKeys[i].virtualKey);
+            if (modifierKeys[i].enabled && modifierKeys[i].key != stroke.virtualKey) {
+                LiSendKeyboardEvent2(0x8000 | modifierKeys[i].key, KEY_ACTION_UP, 0, 0);
+                m_KeysDown.remove(modifierKeys[i].key);
             }
         }
     }
 }
+
+void SdlInputHandler::releasePenGesture()
+{
+    if (m_ActivePenGestureSlot < 0) return;
+    const auto action = m_ActiveTabletMappings[m_ActivePenGestureSlot];
+    if (m_PenGestureContactActive && action.mouseButton != TabletMouseNone)
+        LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, static_cast<char>(action.mouseButton));
+    if (m_PenGestureKeysDown) sendTabletKeyStroke(action.chord, false);
+    m_PenGestureContactActive = false;
+    m_PenGestureKeysDown = false;
+    m_ActivePenGestureSlot = -1;
+}
+
+void SdlInputHandler::releaseTabletActions()
+{
+    releasePenGesture();
+    for (int slot = 0; slot < TabletMappingManager::SlotCount; ++slot) {
+        const auto action = m_ActiveTabletMappings[slot];
+        if (action.kind == TabletActionKind::KeyChord && action.activation == TabletActivation::Hold)
+            sendTabletKeyStroke(action.chord, false);
+        m_ActiveTabletMappings[slot] = {};
+        m_TabletSourceActive[slot] = false;
+    }
+}
+
+#ifdef Q_OS_WIN32
+bool SdlInputHandler::nativePenGestureCallback(void* context, uint8_t eventType, float x, float y,
+                                               bool inContact)
+{
+    return static_cast<SdlInputHandler*>(context)->handleNativePenGesture(eventType, x, y, inContact);
+}
+
+bool SdlInputHandler::handleNativePenGesture(uint8_t eventType, float x, float y, bool inContact)
+{
+    if (m_ActivePenGestureSlot < 0) return false;
+    const auto action = m_ActiveTabletMappings[m_ActivePenGestureSlot];
+    if (eventType != LI_TOUCH_EVENT_HOVER_LEAVE && eventType != LI_TOUCH_EVENT_CANCEL &&
+            eventType != LI_TOUCH_EVENT_CANCEL_ALL) {
+        LiSendMousePositionEvent(static_cast<short>(x * m_StreamWidth),
+                                 static_cast<short>(y * m_StreamHeight),
+                                 m_StreamWidth, m_StreamHeight);
+    }
+
+    if (inContact && !m_PenGestureContactActive) {
+        if (!m_PenGestureKeysDown) {
+            sendTabletKeyStroke(action.chord, true);
+            m_PenGestureKeysDown = true;
+        }
+        if (action.mouseButton != TabletMouseNone)
+            LiSendMouseButtonEvent(BUTTON_ACTION_PRESS, static_cast<char>(action.mouseButton));
+        m_PenGestureContactActive = true;
+    }
+    if ((!inContact || eventType == LI_TOUCH_EVENT_UP || eventType == LI_TOUCH_EVENT_CANCEL ||
+            eventType == LI_TOUCH_EVENT_CANCEL_ALL || eventType == LI_TOUCH_EVENT_HOVER_LEAVE) &&
+            m_PenGestureContactActive) {
+        if (action.mouseButton != TabletMouseNone)
+            LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, static_cast<char>(action.mouseButton));
+        if (m_PenGestureKeysDown && action.mouseButton != TabletMouseNone) {
+            sendTabletKeyStroke(action.chord, false);
+            m_PenGestureKeysDown = false;
+        }
+        m_PenGestureContactActive = false;
+    }
+    return true;
+}
+#endif
 
 // These are real Windows VK_* codes
 #ifndef VK_F1
@@ -79,159 +285,47 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
 {
     switch (combo) {
     case KeyComboQuit:
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "Detected quit key combo");
-
-        // Push a quit event to the main loop
-        SDL_Event event;
-        event.type = SDL_QUIT;
-        event.quit.timestamp = SDL_GetTicks();
-        SDL_PushEvent(&event);
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Detected quit key combo");
+        { SDL_Event event{}; event.type = SDL_QUIT; event.quit.timestamp = SDL_GetTicks(); SDL_PushEvent(&event); }
         break;
-
     case KeyComboUngrabInput:
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "Detected mouse capture toggle combo");
-
-        // Stop handling future input
-        setCaptureActive(!isCaptureActive());
-
-        // Force raise all keys to ensure they aren't stuck,
-        // since we won't get their key up events.
-        raiseAllKeys();
-        break;
-
+        setCaptureActive(!isCaptureActive()); raiseAllKeys(); break;
     case KeyComboToggleFullScreen:
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "Detected full-screen toggle combo");
-        Session::s_ActiveSession->toggleFullscreen();
-
-        // Force raise all keys just be safe across this full-screen/windowed
-        // transition just in case key events get lost.
-        raiseAllKeys();
-        break;
-
+        Session::s_ActiveSession->toggleFullscreen(); raiseAllKeys(); break;
     case KeyComboToggleStatsOverlay:
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "Detected stats toggle combo");
-
-        // Toggle the stats overlay
         Session::get()->getOverlayManager().setOverlayState(Overlay::OverlayDebug,
-                                                            !Session::get()->getOverlayManager().isOverlayEnabled(Overlay::OverlayDebug));
-        break;
-
+            !Session::get()->getOverlayManager().isOverlayEnabled(Overlay::OverlayDebug)); break;
     case KeyComboToggleMouseMode:
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "Detected mouse mode toggle combo");
-
-        // Uncapture input
-        setCaptureActive(false);
-
-        // Toggle mouse mode
-        m_AbsoluteMouseMode = !m_AbsoluteMouseMode;
-
-        // Recapture input
-        setCaptureActive(true);
-        break;
-
+        setCaptureActive(false); m_AbsoluteMouseMode = !m_AbsoluteMouseMode; setCaptureActive(true); break;
     case KeyComboToggleCursorHide:
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "Detected show mouse combo");
-
-        if (!SDL_GetRelativeMouseMode()) {
-            m_MouseCursorCapturedVisibilityState = !m_MouseCursorCapturedVisibilityState;
-            SDL_ShowCursor(m_MouseCursorCapturedVisibilityState);
-        }
-        else {
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "Cursor can only be shown in remote desktop mouse mode");
-        }
+        if (!SDL_GetRelativeMouseMode()) { m_MouseCursorCapturedVisibilityState = !m_MouseCursorCapturedVisibilityState; SDL_ShowCursor(m_MouseCursorCapturedVisibilityState); }
         break;
-
     case KeyComboToggleMinimize:
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "Detected minimize combo");
-        SDL_MinimizeWindow(m_Window);
-        break;
-
+        SDL_MinimizeWindow(m_Window); break;
     case KeyComboPasteText:
     {
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "Detected type clipboard text combo");
-
-        // Force raise all keys to ensure that none of them interfere
-        // with the text we're going to type.
         raiseAllKeys();
-
-        char* text;
+        char* text = nullptr;
         if (SDL_HasClipboardText() && (text = SDL_GetClipboardText()) != nullptr) {
-            // Sending both CR and LF will lead to two newlines in the destination for
-            // each newline in the source, so we fix up any CRLFs into just a single LF.
-            for (char* c = text; *c != 0; c++) {
-                if (*c == '\r' && *(c + 1) == '\n') {
-                    // We're using strlen() rather than strlen() - 1 since we need to add 1
-                    // to copy the null terminator which is not included in strlen()'s count.
-                    memmove(c, c + 1, strlen(c));
-                }
+            for (char* c = text; *c != 0; ++c) {
+                if (*c == '\r' && *(c + 1) == '\n') memmove(c, c + 1, strlen(c));
             }
-
-            // Send this text to the PC
-            LiSendUtf8TextEvent(text, (unsigned int)strlen(text));
-
-            // SDL_GetClipboardText() allocates, so we must free
-            SDL_free((void*)text);
-        }
-        else {
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "No text in clipboard to paste!");
+            LiSendUtf8TextEvent(text, static_cast<unsigned int>(strlen(text)));
+            SDL_free(text);
         }
         break;
     }
-
     case KeyComboTogglePointerRegionLock:
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "Detected pointer region lock toggle combo");
         m_PointerRegionLockActive = !m_PointerRegionLockActive;
-
-        // Remember that the user changed this manually, so we don't mess with it anymore
-        // during windowed <-> full-screen transitions.
-        m_PointerRegionLockToggledByUser = true;
-
-        // Apply the new region lock
-        updatePointerRegionLock();
-        break;
-
+        m_PointerRegionLockToggledByUser = true; updatePointerRegionLock(); break;
     case KeyComboQuitAndExit:
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "Detected quitAndExit key combo");
-
-        // Indicate that we want to exit afterwards
         Session::get()->setShouldExit(true);
-
-        // Push a quit event to the main loop
-        SDL_Event quitExitEvent;
-        quitExitEvent.type = SDL_QUIT;
-        quitExitEvent.quit.timestamp = SDL_GetTicks();
-        SDL_PushEvent(&quitExitEvent);
+        { SDL_Event event{}; event.type = SDL_QUIT; event.quit.timestamp = SDL_GetTicks(); SDL_PushEvent(&event); }
         break;
-
     case KeyComboToggleKeyboardGrab:
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "Detected keyboard grab toggle combo");
-
-        // Toggle the system key capture mode
-        if (isSystemKeyCaptureActive()) {
-            m_CaptureSystemKeysMode = StreamingPreferences::CSK_OFF;
-        }
-        else {
-            m_CaptureSystemKeysMode = StreamingPreferences::CSK_ALWAYS;
-        }
-
-        updateKeyboardGrabState();
-        break;
-
-    default:
-        Q_UNREACHABLE();
+        m_CaptureSystemKeysMode = isSystemKeyCaptureActive() ? StreamingPreferences::CSK_OFF : StreamingPreferences::CSK_ALWAYS;
+        updateKeyboardGrabState(); break;
+    default: Q_UNREACHABLE();
     }
 }
 
@@ -241,306 +335,50 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
     char modifiers;
     bool shouldNotConvertToScanCodeOnServer = false;
 
-    if (event->repeat) {
-        // Ignore repeat key down events
-        SDL_assert(event->state == SDL_PRESSED);
-        return;
-    }
+    if (handleTabletMappedKey(event)) return;
+    if (event->repeat) return;
 
-    if (handleTabletMappedKey(event)) {
-        return;
-    }
-
-    // Check for our special key combos
-    if ((event->state == SDL_PRESSED) &&
-            (event->keysym.mod & KMOD_CTRL) &&
-            (event->keysym.mod & KMOD_ALT) &&
-            (event->keysym.mod & KMOD_SHIFT)) {
-        // First we test the SDLK combos for matches,
-        // that way we ensure that latin keyboard users
-        // can match to the key they see on their keyboards.
-        // If nothing matches that, we'll then go on to
-        // checking scancodes so non-latin keyboard users
-        // can have working hotkeys (though possibly in
-        // odd positions). We must do all SDLK tests before
-        // any scancode tests to avoid issues in cases
-        // where the SDLK for one shortcut collides with
-        // the scancode of another.
-
-        for (int i = 0; i < KeyComboMax; i++) {
+    if ((event->state == SDL_PRESSED) && (event->keysym.mod & KMOD_CTRL) &&
+            (event->keysym.mod & KMOD_ALT) && (event->keysym.mod & KMOD_SHIFT)) {
+        for (int i = 0; i < KeyComboMax; ++i) {
             if (m_SpecialKeyCombos[i].enabled && event->keysym.sym == m_SpecialKeyCombos[i].keyCode) {
-                performSpecialKeyCombo(m_SpecialKeyCombos[i].keyCombo);
-                return;
+                performSpecialKeyCombo(m_SpecialKeyCombos[i].keyCombo); return;
             }
         }
-
-        for (int i = 0; i < KeyComboMax; i++) {
+        for (int i = 0; i < KeyComboMax; ++i) {
             if (m_SpecialKeyCombos[i].enabled && event->keysym.scancode == m_SpecialKeyCombos[i].scanCode) {
-                performSpecialKeyCombo(m_SpecialKeyCombos[i].keyCombo);
-                return;
+                performSpecialKeyCombo(m_SpecialKeyCombos[i].keyCombo); return;
             }
         }
     }
 
-    // Set modifier flags
     modifiers = 0;
-    if (event->keysym.mod & KMOD_CTRL) {
-        modifiers |= MODIFIER_CTRL;
-    }
-    if (event->keysym.mod & KMOD_ALT) {
-        modifiers |= MODIFIER_ALT;
-    }
-    if (event->keysym.mod & KMOD_SHIFT) {
-        modifiers |= MODIFIER_SHIFT;
-    }
-    if (event->keysym.mod & KMOD_GUI) {
-        if (isSystemKeyCaptureActive()) {
-            modifiers |= MODIFIER_META;
-        }
+    if (event->keysym.mod & KMOD_CTRL) modifiers |= MODIFIER_CTRL;
+    if (event->keysym.mod & KMOD_ALT) modifiers |= MODIFIER_ALT;
+    if (event->keysym.mod & KMOD_SHIFT) modifiers |= MODIFIER_SHIFT;
+    if ((event->keysym.mod & KMOD_GUI) && isSystemKeyCaptureActive()) modifiers |= MODIFIER_META;
+
+    keyCode = static_cast<short>(virtualKeyForScancode(event->keysym.scancode));
+    if (!keyCode) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Unhandled scancode: %d", event->keysym.scancode);
+        return;
     }
 
-    // Set keycode. We explicitly use scancode here because GFE will try to correct
-    // for AZERTY layouts on the host but it depends on receiving VK_ values matching
-    // a QWERTY layout to work.
-    if (event->keysym.scancode >= SDL_SCANCODE_1 && event->keysym.scancode <= SDL_SCANCODE_9) {
-        // SDL defines SDL_SCANCODE_0 > SDL_SCANCODE_9, so we need to handle that manually
-        keyCode = (event->keysym.scancode - SDL_SCANCODE_1) + VK_0 + 1;
-    }
-    else if (event->keysym.scancode >= SDL_SCANCODE_A && event->keysym.scancode <= SDL_SCANCODE_Z) {
-        keyCode = (event->keysym.scancode - SDL_SCANCODE_A) + VK_A;
-    }
-    else if (event->keysym.scancode >= SDL_SCANCODE_F1 && event->keysym.scancode <= SDL_SCANCODE_F12) {
-        keyCode = (event->keysym.scancode - SDL_SCANCODE_F1) + VK_F1;
-    }
-    else if (event->keysym.scancode >= SDL_SCANCODE_F13 && event->keysym.scancode <= SDL_SCANCODE_F24) {
-        keyCode = (event->keysym.scancode - SDL_SCANCODE_F13) + VK_F13;
-    }
-    else if (event->keysym.scancode >= SDL_SCANCODE_KP_1 && event->keysym.scancode <= SDL_SCANCODE_KP_9) {
-        // SDL defines SDL_SCANCODE_KP_0 > SDL_SCANCODE_KP_9, so we need to handle that manually
-        keyCode = (event->keysym.scancode - SDL_SCANCODE_KP_1) + VK_NUMPAD0 + 1;
-    }
-    else {
-        switch (event->keysym.scancode) {
-            case SDL_SCANCODE_BACKSPACE:
-                keyCode = 0x08;
-                break;
-            case SDL_SCANCODE_TAB:
-                keyCode = 0x09;
-                break;
-            case SDL_SCANCODE_CLEAR:
-                keyCode = 0x0C;
-                break;
-            case SDL_SCANCODE_KP_ENTER: // FIXME: Is this correct?
-            case SDL_SCANCODE_RETURN:
-                keyCode = 0x0D;
-                break;
-            case SDL_SCANCODE_PAUSE:
-                keyCode = 0x13;
-                break;
-            case SDL_SCANCODE_CAPSLOCK:
-                keyCode = 0x14;
-                break;
-            case SDL_SCANCODE_ESCAPE:
-                keyCode = 0x1B;
-                break;
-            case SDL_SCANCODE_SPACE:
-                keyCode = 0x20;
-                break;
-            case SDL_SCANCODE_PAGEUP:
-                keyCode = 0x21;
-                break;
-            case SDL_SCANCODE_PAGEDOWN:
-                keyCode = 0x22;
-                break;
-            case SDL_SCANCODE_END:
-                keyCode = 0x23;
-                break;
-            case SDL_SCANCODE_HOME:
-                keyCode = 0x24;
-                break;
-            case SDL_SCANCODE_LEFT:
-                keyCode = 0x25;
-                break;
-            case SDL_SCANCODE_UP:
-                keyCode = 0x26;
-                break;
-            case SDL_SCANCODE_RIGHT:
-                keyCode = 0x27;
-                break;
-            case SDL_SCANCODE_DOWN:
-                keyCode = 0x28;
-                break;
-            case SDL_SCANCODE_SELECT:
-                keyCode = 0x29;
-                break;
-            case SDL_SCANCODE_EXECUTE:
-                keyCode = 0x2B;
-                break;
-            case SDL_SCANCODE_PRINTSCREEN:
-                keyCode = 0x2C;
-                break;
-            case SDL_SCANCODE_INSERT:
-                keyCode = 0x2D;
-                break;
-            case SDL_SCANCODE_DELETE:
-                keyCode = 0x2E;
-                break;
-            case SDL_SCANCODE_HELP:
-                keyCode = 0x2F;
-                break;
-            case SDL_SCANCODE_KP_0:
-                // See comment above about why we only handle SDL_SCANCODE_KP_0 here
-                keyCode = VK_NUMPAD0;
-                break;
-            case SDL_SCANCODE_0:
-                // See comment above about why we only handle SDL_SCANCODE_0 here
-                keyCode = VK_0;
-                break;
-            case SDL_SCANCODE_KP_MULTIPLY:
-                keyCode = 0x6A;
-                break;
-            case SDL_SCANCODE_KP_PLUS:
-                keyCode = 0x6B;
-                break;
-            case SDL_SCANCODE_KP_COMMA:
-                keyCode = 0x6C;
-                break;
-            case SDL_SCANCODE_KP_MINUS:
-                keyCode = 0x6D;
-                break;
-            case SDL_SCANCODE_KP_PERIOD:
-                keyCode = 0x6E;
-                break;
-            case SDL_SCANCODE_KP_DIVIDE:
-                keyCode = 0x6F;
-                break;
-            case SDL_SCANCODE_NUMLOCKCLEAR:
-                keyCode = 0x90;
-                break;
-            case SDL_SCANCODE_SCROLLLOCK:
-                keyCode = 0x91;
-                break;
-            case SDL_SCANCODE_LSHIFT:
-                keyCode = 0xA0;
-                break;
-            case SDL_SCANCODE_RSHIFT:
-                keyCode = 0xA1;
-                break;
-            case SDL_SCANCODE_LCTRL:
-                keyCode = 0xA2;
-                break;
-            case SDL_SCANCODE_RCTRL:
-                keyCode = 0xA3;
-                break;
-            case SDL_SCANCODE_LALT:
-                keyCode = 0xA4;
-                break;
-            case SDL_SCANCODE_RALT:
-                keyCode = 0xA5;
-                break;
-            case SDL_SCANCODE_LGUI:
-                if (!isSystemKeyCaptureActive()) {
-                    return;
-                }
-                keyCode = 0x5B;
-                break;
-            case SDL_SCANCODE_RGUI:
-                if (!isSystemKeyCaptureActive()) {
-                    return;
-                }
-                keyCode = 0x5C;
-                break;
-            case SDL_SCANCODE_APPLICATION:
-                keyCode = 0x5D;
-                break;
-            case SDL_SCANCODE_AC_BACK:
-                keyCode = 0xA6;
-                break;
-            case SDL_SCANCODE_AC_FORWARD:
-                keyCode = 0xA7;
-                break;
-            case SDL_SCANCODE_AC_REFRESH:
-                keyCode = 0xA8;
-                break;
-            case SDL_SCANCODE_AC_STOP:
-                keyCode = 0xA9;
-                break;
-            case SDL_SCANCODE_AC_SEARCH:
-                keyCode = 0xAA;
-                break;
-            case SDL_SCANCODE_AC_BOOKMARKS:
-                keyCode = 0xAB;
-                break;
-            case SDL_SCANCODE_AC_HOME:
-                keyCode = 0xAC;
-                break;
-            case SDL_SCANCODE_SEMICOLON:
-                keyCode = 0xBA;
-                break;
-            case SDL_SCANCODE_EQUALS:
-                keyCode = 0xBB;
-                break;
-            case SDL_SCANCODE_COMMA:
-                keyCode = 0xBC;
-                break;
-            case SDL_SCANCODE_MINUS:
-                keyCode = 0xBD;
-                break;
-            case SDL_SCANCODE_PERIOD:
-                keyCode = 0xBE;
-                break;
-            case SDL_SCANCODE_SLASH:
-                keyCode = 0xBF;
-                break;
-            case SDL_SCANCODE_GRAVE:
-                keyCode = 0xC0;
-                break;
-            case SDL_SCANCODE_LEFTBRACKET:
-                keyCode = 0xDB;
-                break;
-            case SDL_SCANCODE_INTERNATIONAL3:
-                shouldNotConvertToScanCodeOnServer = true;
-                Q_FALLTHROUGH();
-            case SDL_SCANCODE_BACKSLASH:
-                keyCode = 0xDC;
-                break;
-            case SDL_SCANCODE_RIGHTBRACKET:
-                keyCode = 0xDD;
-                break;
-            case SDL_SCANCODE_APOSTROPHE:
-                keyCode = 0xDE;
-                break;
-            case SDL_SCANCODE_INTERNATIONAL1:
-                shouldNotConvertToScanCodeOnServer = true;
-                Q_FALLTHROUGH();
-            case SDL_SCANCODE_NONUSBACKSLASH:
-                keyCode = 0xE2;
-                break;
-            case SDL_SCANCODE_LANG1:
-                keyCode = 0x1C;
-                break;
-            case SDL_SCANCODE_LANG2:
-                keyCode = 0x1D;
-                break;
-            default:
-                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                            "Unhandled button event: %d",
-                             event->keysym.scancode);
-                return;
-        }
-    }
+    if ((event->keysym.scancode == SDL_SCANCODE_LGUI || event->keysym.scancode == SDL_SCANCODE_RGUI) &&
+            !isSystemKeyCaptureActive()) return;
 
-    // Track the key state so we always know which keys are down
-    if (event->state == SDL_PRESSED) {
-        m_KeysDown.insert(keyCode);
-    }
-    else {
-        m_KeysDown.remove(keyCode);
-    }
+    if (event->keysym.scancode == SDL_SCANCODE_RALT || event->keysym.scancode == SDL_SCANCODE_RCTRL ||
+            event->keysym.scancode == SDL_SCANCODE_RSHIFT || event->keysym.scancode == SDL_SCANCODE_RGUI)
+        keyCode = virtualKeyForScancode(event->keysym.scancode) == 0x5C ? 0x5C : keyCode + 1;
+
+    if (event->keysym.scancode == SDL_SCANCODE_LGUI || event->keysym.scancode == SDL_SCANCODE_RGUI ||
+            event->keysym.scancode == SDL_SCANCODE_INTERNATIONAL1 ||
+            event->keysym.scancode == SDL_SCANCODE_INTERNATIONAL3)
+        shouldNotConvertToScanCodeOnServer = true;
 
     LiSendKeyboardEvent2(0x8000 | keyCode,
-                        event->state == SDL_PRESSED ?
-                            KEY_ACTION_DOWN : KEY_ACTION_UP,
-                        modifiers,
-                        shouldNotConvertToScanCodeOnServer ? SS_KBE_FLAG_NON_NORMALIZED : 0);
+                         event->state == SDL_PRESSED ? KEY_ACTION_DOWN : KEY_ACTION_UP,
+                         modifiers, shouldNotConvertToScanCodeOnServer ? SS_KBE_FLAG_NON_NORMALIZED : 0);
+    if (event->state == SDL_PRESSED) m_KeysDown.insert(keyCode);
+    else m_KeysDown.remove(keyCode);
 }

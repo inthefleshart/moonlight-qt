@@ -25,6 +25,11 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_PendingMouseButtonsAllUpOnVideoRegionLeave(false),
       m_PointerRegionLockActive(false),
       m_PointerRegionLockToggledByUser(false),
+      m_ActivePenGestureSlot(-1),
+      m_PenGestureContactActive(false),
+      m_PenGestureKeysDown(false),
+      m_TouchForwardingEnabled(true),
+      m_RuntimeDiagnosticsEnabled(prefs.inputDiagnostics),
       m_FakeMouseCaptureActive(false),
       m_KeyboardCaptureActive(false),
       m_CaptureSystemKeysMode(prefs.captureSysKeysMode),
@@ -44,8 +49,15 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
 {
 #ifdef Q_OS_WIN32
     if (prefs.nativePenInput) {
+        // sdl2-compat exposes SDL3 pen promotion controls by their SDL3 names.
+        // Native WM_POINTER is authoritative, so promoted mouse/touch events
+        // would otherwise duplicate the same physical pen sample.
+        SDL_SetHint("SDL_PEN_MOUSE_EVENTS", "0");
+        SDL_SetHint("SDL_PEN_TOUCH_EVENTS", "0");
         m_NativePenBridge = std::make_unique<WinPointerBridge>(streamWidth, streamHeight,
-                                                               prefs.inputDiagnostics);
+                                                               prefs.inputDiagnostics,
+                                                               static_cast<int>(prefs.penCursorPolicy),
+                                                               this, nativePenGestureCallback);
     }
 #endif
     // System keys are always captured when running without a DE
@@ -214,11 +226,11 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
     SDL_zero(m_LastTouchDownEvent);
     SDL_zero(m_LastTouchUpEvent);
     SDL_zero(m_TouchDownEvent);
-    SDL_zero(m_ActiveTabletMappings);
 }
 
 SdlInputHandler::~SdlInputHandler()
 {
+    releaseTabletActions();
     for (int i = 0; i < MAX_GAMEPADS; i++) {
         if (m_GamepadState[i].mouseEmulationTimer != 0) {
             Session::get()->notifyMouseEmulationMode(false);
@@ -331,6 +343,7 @@ void SdlInputHandler::notifyMouseLeave()
 
 void SdlInputHandler::notifyFocusLost()
 {
+    releaseTabletActions();
 #ifdef Q_OS_WIN32
     if (m_NativePenBridge) {
         m_NativePenBridge->cancelActivePen();
@@ -470,6 +483,9 @@ void SdlInputHandler::setCaptureActive(bool active)
 
 void SdlInputHandler::handleTouchFingerEvent(SDL_TouchFingerEvent* event)
 {
+    if (!m_TouchForwardingEnabled) {
+        return;
+    }
 #ifdef Q_OS_WIN32
     if (m_TouchPolicy == StreamingPreferences::TOUCH_DISABLE_WHILE_PEN_IN_RANGE &&
             m_NativePenBridge) {

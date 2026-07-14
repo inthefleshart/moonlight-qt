@@ -5,6 +5,7 @@ param(
     [ValidateSet('x64')]
     [string]$Architecture = 'x64',
     [switch]$Clean,
+    [switch]$BuildInstaller,
     [switch]$EnableLocalWintab
 )
 
@@ -28,8 +29,9 @@ if ($root.Contains(' ')) {
     $junction = Join-Path $env:TEMP 'moonlight-wacom-src'
     if (Test-Path -LiteralPath $junction) {
         $item = Get-Item -LiteralPath $junction -Force
+        $junctionTarget = if ($item.Target) { [IO.Path]::GetFullPath([string]$item.Target) } else { $null }
         if (-not ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
-            (Resolve-Path -LiteralPath $junction).Path -ne $root) {
+            $junctionTarget -ne [IO.Path]::GetFullPath($root)) {
             throw "The build junction $junction exists but does not point to this repository. Remove it manually after verifying its target."
         }
     } else {
@@ -39,6 +41,11 @@ if ($root.Contains(' ')) {
 }
 
 $env:PATH = (Join-Path $qtRoot 'bin') + ';' + $sevenZip + ';' + $env:PATH
+# Some managed shells expose an inherited PATH that jom's worker processes do
+# not preserve. nmake is serial but reliable and remains inside vcvarsall.
+$env:MOONLIGHT_USE_NMAKE = '1'
+if ($Clean) { $env:MOONLIGHT_CLEAN = '1' } else { Remove-Item Env:MOONLIGHT_CLEAN -ErrorAction SilentlyContinue }
+if ($BuildInstaller) { Remove-Item Env:MOONLIGHT_SKIP_MSI -ErrorAction SilentlyContinue } else { $env:MOONLIGHT_SKIP_MSI = '1' }
 Push-Location $buildRoot
 try {
     & cmd.exe /d /c scripts\build-arch.bat $Configuration.ToLowerInvariant()

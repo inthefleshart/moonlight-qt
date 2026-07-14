@@ -4,6 +4,10 @@
 #include "SDL_compat.h"
 #include "streaming/streamutils.h"
 
+#ifdef Q_OS_WIN32
+#include "winpointer.h"
+#endif
+
 void SdlInputHandler::handleMouseButtonEvent(SDL_MouseButtonEvent* event)
 {
     int button;
@@ -12,6 +16,11 @@ void SdlInputHandler::handleMouseButtonEvent(SDL_MouseButtonEvent* event)
         // Ignore synthetic mouse events
         return;
     }
+#ifdef Q_OS_WIN32
+    else if (m_NativePenBridge && m_NativePenBridge->consumePromotedMouseButton()) {
+        return;
+    }
+#endif
     else if (!isCaptureActive()) {
         if (event->button == SDL_BUTTON_LEFT && event->state == SDL_RELEASED &&
                 isMouseInVideoRegion(event->x, event->y)) {
@@ -78,6 +87,14 @@ void SdlInputHandler::handleMouseMotionEvent(SDL_MouseMotionEvent* event)
         // Ignore synthetic mouse events
         return;
     }
+#ifdef Q_OS_WIN32
+    else if (m_NativePenBridge && m_NativePenBridge->consumePromotedMouseMotion()) {
+        return;
+    }
+    else if (m_NativePenBridge) {
+        m_NativePenBridge->notifyRealMouseMotion();
+    }
+#endif
 
     // Batch all pending mouse motion events to save CPU time
     Sint32 x = event->x, y = event->y, xrel = event->xrel, yrel = event->yrel;

@@ -54,6 +54,7 @@
 #define SER_NATIVEPENINPUT "nativepeninput"
 #define SER_INPUTDIAGNOSTICS "inputdiagnostics"
 #define SER_TOUCHPOLICY "touchpolicy"
+#define SER_PENCURSORPOLICY "pencursorpolicy"
 
 #define CURRENT_DEFAULT_VER 2
 
@@ -149,6 +150,11 @@ void StreamingPreferences::reload()
         SER_TOUCHPOLICY, static_cast<int>(TouchPolicy::TOUCH_WINDOWS_DEFAULT)).toInt());
     if (touchPolicy < TOUCH_WINDOWS_DEFAULT || touchPolicy > TOUCH_ALWAYS_FORWARD) {
         touchPolicy = TOUCH_WINDOWS_DEFAULT;
+    }
+    penCursorPolicy = static_cast<PenCursorPolicy>(settings.value(
+        SER_PENCURSORPOLICY, static_cast<int>(PenCursorPolicy::PEN_CURSOR_AUTOMATIC)).toInt());
+    if (penCursorPolicy < PEN_CURSOR_AUTOMATIC || penCursorPolicy > PEN_CURSOR_HIDE_IN_RANGE) {
+        penCursorPolicy = PEN_CURSOR_AUTOMATIC;
     }
     framePacing = settings.value(SER_FRAMEPACING, false).toBool();
     connectionWarnings = settings.value(SER_CONNWARNINGS, true).toBool();
@@ -351,6 +357,7 @@ void StreamingPreferences::save()
     settings.setValue(SER_NATIVEPENINPUT, nativePenInput);
     settings.setValue(SER_INPUTDIAGNOSTICS, inputDiagnostics);
     settings.setValue(SER_TOUCHPOLICY, static_cast<int>(touchPolicy));
+    settings.setValue(SER_PENCURSORPOLICY, static_cast<int>(penCursorPolicy));
     settings.setValue(SER_FRAMEPACING, framePacing);
     settings.setValue(SER_CONNWARNINGS, connectionWarnings);
     settings.setValue(SER_CONFWARNINGS, configurationWarnings);

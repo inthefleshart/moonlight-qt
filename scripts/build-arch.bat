@@ -144,15 +144,17 @@ rem Find VC redistributable DLLs
 for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -find VC\Redist\MSVC\*\%ARCH%\Microsoft.VC*.CRT`) do set VC_REDIST_DLL_PATH=%%i
 
 echo Cleaning output directories
-rmdir /s /q %DEPLOY_FOLDER%
-rmdir /s /q %BUILD_FOLDER%
-rmdir /s /q %INSTALLER_FOLDER%
-rmdir /s /q %SYMBOLS_FOLDER%
-mkdir %BUILD_ROOT%
-mkdir %DEPLOY_FOLDER%
-mkdir %BUILD_FOLDER%
-mkdir %INSTALLER_FOLDER%
-mkdir %SYMBOLS_FOLDER%
+if defined MOONLIGHT_CLEAN (
+    rmdir /s /q %DEPLOY_FOLDER%
+    rmdir /s /q %BUILD_FOLDER%
+    rmdir /s /q %INSTALLER_FOLDER%
+    rmdir /s /q %SYMBOLS_FOLDER%
+)
+if not exist %BUILD_ROOT% mkdir %BUILD_ROOT%
+if not exist %DEPLOY_FOLDER% mkdir %DEPLOY_FOLDER%
+if not exist %BUILD_FOLDER% mkdir %BUILD_FOLDER%
+if not exist %INSTALLER_FOLDER% mkdir %INSTALLER_FOLDER%
+if not exist %SYMBOLS_FOLDER% mkdir %SYMBOLS_FOLDER%
 
 rem Enable LTCG for official builds
 set CFLAGS=/GL
@@ -167,7 +169,11 @@ popd
 
 echo Compiling Moonlight in %BUILD_CONFIG% configuration
 pushd %BUILD_FOLDER%
-%SOURCE_ROOT%\scripts\jom.exe %BUILD_CONFIG%
+if "%MOONLIGHT_USE_NMAKE%"=="1" (
+    nmake %BUILD_CONFIG%
+) else (
+    %SOURCE_ROOT%\scripts\jom.exe %BUILD_CONFIG%
+)
 if !ERRORLEVEL! NEQ 0 goto Error
 popd
 
@@ -266,9 +272,13 @@ if "%ML_SYMBOL_STORE%" NEQ "" (
     if !ERRORLEVEL! NEQ 0 goto Error
 )
 
-echo Building MSI
-cmd /c "set VERSION= && msbuild -Restore %SOURCE_ROOT%\wix\Moonlight\Moonlight.wixproj /p:Configuration=%BUILD_CONFIG% /p:Platform=%ARCH% /p:MSBuildProjectExtensionsPath=%BUILD_FOLDER%\"
-if !ERRORLEVEL! NEQ 0 goto Error
+if not defined MOONLIGHT_SKIP_MSI (
+    echo Building MSI
+    cmd /c "set VERSION= && msbuild -Restore %SOURCE_ROOT%\wix\Moonlight\Moonlight.wixproj /p:Configuration=%BUILD_CONFIG% /p:Platform=%ARCH% /p:MSBuildProjectExtensionsPath=%BUILD_FOLDER%\"
+    if !ERRORLEVEL! NEQ 0 goto Error
+) else (
+    echo Skipping MSI; portable package only
+)
 
 echo Copying application binary to deployment directory
 copy %BUILD_FOLDER%\app\%BUILD_CONFIG%\Moonlight.exe %DEPLOY_FOLDER%
