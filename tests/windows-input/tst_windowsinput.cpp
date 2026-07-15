@@ -172,8 +172,12 @@ void WindowsInputTests::quickKeyOverlayMatchesPhysicalButtonLayout()
     const auto layout = Overlay::QuickKeyOverlayLayout::calculate(2560, 1440, 10);
     QCOMPARE(layout.profileRows.size(), 10);
     QVERIFY(layout.leftPanel.width() > 0);
-    QVERIFY(layout.presetPanel.width() > layout.leftPanel.width());
+    QVERIFY(layout.presetPanel.width() > layout.leftPanel.width() * 2);
     QCOMPARE(layout.leftPanel.width(), layout.rightPanel.width());
+    QCOMPARE(layout.profileUpButton.width(), layout.presetPanel.width());
+    QCOMPARE(layout.profileDownButton.width(), layout.presetPanel.width());
+    QVERIFY(layout.profileUpButton.bottom() < layout.profileRows.first().top());
+    QVERIFY(layout.profileDownButton.top() > layout.profileRows.last().bottom());
 
     for (int slot = 0; slot < 5; ++slot) {
         QCOMPARE(Overlay::QuickKeyOverlayLayout::panelForSlot(slot),
@@ -215,6 +219,14 @@ void WindowsInputTests::quickKeyOverlayStaysInsideViewport()
         QVERIFY(layout.rightPanel.right() < layout.panelWidth);
         for (const QRect& rect : layout.profileRows)
             QVERIFY(layout.presetPanel.contains(rect));
+        QVERIFY(layout.presetPanel.contains(layout.profileUpButton));
+        QVERIFY(layout.presetPanel.contains(layout.profileDownButton));
+        if (!layout.profileRows.isEmpty()) {
+            QVERIFY(layout.profileUpButton.bottom() < layout.profileRows.first().top());
+            QVERIFY(layout.profileRows.last().bottom() < layout.profileDownButton.top());
+            for (int row = 1; row < layout.profileRows.size(); ++row)
+                QVERIFY(layout.profileRows[row - 1].bottom() < layout.profileRows[row].top());
+        }
         for (const QRect& rect : layout.bindingRows)
             QVERIFY(rect.right() < layout.panelWidth && rect.bottom() < layout.panelHeight);
     }

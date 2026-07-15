@@ -41,12 +41,12 @@ QuickKeyOverlayLayout QuickKeyOverlayLayout::calculate(int viewportWidth, int vi
                               std::max(8, static_cast<int>(12 * layout.scale));
     const int contentHeight = std::max(1, contentBottom - contentTop);
     const int columnsWidth = std::max(1, layout.panelWidth - layout.padding * 2 - columnGap * 2);
-    const int sideWidth = columnsWidth * 30 / 94;
+    const int sideWidth = columnsWidth * 24 / 100;
     const int middleWidth = columnsWidth - sideWidth * 2;
     layout.sectionHeight = std::min(contentHeight / 3,
                                     std::max(20, static_cast<int>(42 * layout.scale)));
     layout.compact = sideWidth < 285;
-    layout.showActionDetails = sideWidth >= 360;
+    layout.showActionDetails = sideWidth >= 300;
 
     const int leftX = layout.padding;
     const int middleX = leftX + sideWidth + columnGap;
@@ -57,11 +57,25 @@ QuickKeyOverlayLayout QuickKeyOverlayLayout::calculate(int viewportWidth, int vi
 
     const int profileCount = std::max(0, visibleProfileCount);
     const int profileTop = layout.presetPanel.y() + layout.sectionHeight;
-    const int profileHeight = std::max(1, layout.presetPanel.bottom() + 1 - profileTop);
+    const int profileAreaHeight = std::max(1, layout.presetPanel.height() - layout.sectionHeight);
+    const int minimumRowsHeight = std::min(profileAreaHeight / 2, profileCount * 2);
+    const int desiredNavigationHeight = std::max(34, static_cast<int>(48 * layout.scale));
+    const int navigationHeight = std::min(desiredNavigationHeight,
+                                          std::max(4, (profileAreaHeight - minimumRowsHeight) / 2));
+    const int navigationGap = std::min(navigationHeight - 1,
+                                       std::max(2, static_cast<int>(3 * layout.scale)));
+    layout.profileUpButton = QRect(layout.presetPanel.x(), profileTop,
+                                   layout.presetPanel.width(), navigationHeight - navigationGap);
+    layout.profileDownButton = QRect(layout.presetPanel.x(),
+                                     layout.presetPanel.bottom() + 1 - navigationHeight,
+                                     layout.presetPanel.width(), navigationHeight - navigationGap);
+    const int profileRowsTop = profileTop + navigationHeight;
+    const int profileRowsBottom = layout.profileDownButton.y();
+    const int profileHeight = std::max(1, profileRowsBottom - profileRowsTop);
     const int profileGap = std::max(2, static_cast<int>(3 * layout.scale));
     for (int row = 0; row < profileCount; ++row) {
-        const int y1 = profileTop + profileHeight * row / profileCount;
-        const int y2 = profileTop + profileHeight * (row + 1) / profileCount;
+        const int y1 = profileRowsTop + profileHeight * row / profileCount;
+        const int y2 = profileRowsTop + profileHeight * (row + 1) / profileCount;
         layout.profileRows.append(insetBottom(
             QRect(layout.presetPanel.x(), y1, layout.presetPanel.width(), std::max(1, y2 - y1)),
             profileGap));

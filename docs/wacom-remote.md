@@ -34,14 +34,15 @@ Preset switching updates all ten rows immediately. Presets are listed alphabetic
 Press **Ctrl+Alt+Shift+P** during an active stream to open the local QuickKey preset selector. The shortcut is handled by Moonlight Artist and is not sent to the host.
 
 - Use the pen, touch, mouse, arrow keys, mouse wheel, controller D-pad, or Page Up/Page Down to highlight a preset.
+- Tap the full-width arrow buttons above or below the preset list to move one preset at a time with the pen.
 - Tap/click a row, press Enter, or press controller A to apply it immediately.
 - Press Escape, controller B, or tap outside the panel to cancel.
-- A gold marker identifies presets included in the Next/Previous favorite rotation.
+- A diamond marker identifies presets included in the Next/Previous favorite rotation.
 - Moonlight releases held remote pen, touch, mouse, QuickKey, keyboard, and controller input before changing profiles.
 
-The popup mirrors the physical controls with three panels: F1–F5 mappings on the left, the alphabetized preset list in the middle, and F6–F10 mappings on the right. A labeled **Mode Switch · hardware only** spacer appears between F2/F3 and F7/F8. Highlighting a preset immediately previews all ten friendly action names, shortcuts, holds, sequences, and pen-drag gestures without activating it or discarding customizations. Blue marks the current selection, green the active preset, gold a favorite, and violet plus a **CUSTOM** label a modified binding.
+The popup mirrors the physical controls with three panels: compact F1–F5 mappings on the left, a wider alphabetized preset list in the middle, and compact F6–F10 mappings on the right. A labeled **Mode Switch · hardware only** spacer appears between F2/F3 and F7/F8. Highlighting a preset immediately previews all ten friendly action names, shortcuts, holds, sequences, and pen-drag gestures without activating it or discarding customizations.
 
-The popup uses a greyscale dark theme and the Windows Segoe UI family. Its colored markers communicate state, while selection chevrons, marker shapes, and text labels keep the same information understandable without relying on color alone. Secondary shortcut details are hidden before action names when the stream window is too narrow.
+The popup uses a fully desaturated greyscale dark theme and larger Windows Segoe UI typography. Selection chevrons, marker shapes, borders, brightness, and explicit text labels communicate state without relying on color. Each side mapping is a compact card with its F-key badge and vertically grouped action description. Secondary shortcut details are hidden before action names when the stream window is too narrow.
 
 Use **In-stream favorites…** in Input Settings to enable and reorder the profiles used by **Next favorite QuickKey preset** and **Previous favorite QuickKey preset**. The selector itself always lists every preset alphabetically. The common-action chooser can assign the selector and both cycle actions to any physical QuickKey; no shipped mapping is replaced automatically.
 

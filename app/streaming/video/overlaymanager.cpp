@@ -171,6 +171,12 @@ int OverlayManager::getOverlayLineHeight(OverlayType type)
 
 int OverlayManager::getQuickKeyProfileRowAt(int x, int y) const
 {
+    if (x >= m_QuickKeyPreviousRect.x && x < m_QuickKeyPreviousRect.x + m_QuickKeyPreviousRect.w &&
+            y >= m_QuickKeyPreviousRect.y && y < m_QuickKeyPreviousRect.y + m_QuickKeyPreviousRect.h)
+        return QuickKeyProfileHitPrevious;
+    if (x >= m_QuickKeyNextRect.x && x < m_QuickKeyNextRect.x + m_QuickKeyNextRect.w &&
+            y >= m_QuickKeyNextRect.y && y < m_QuickKeyNextRect.y + m_QuickKeyNextRect.h)
+        return QuickKeyProfileHitNext;
     for (int row = 0; row < m_QuickKeyProfileRects.size(); ++row) {
         const SDL_Rect& rect = m_QuickKeyProfileRects[row];
         if (x >= rect.x && x < rect.x + rect.w && y >= rect.y && y < rect.y + rect.h)
@@ -208,6 +214,10 @@ void OverlayManager::setOverlayState(OverlayType type, bool enabled)
             m_Overlays[type].width = 0;
             m_Overlays[type].height = 0;
             if (type == OverlayQuickKeyProfiles) m_QuickKeyProfileRects.clear();
+            if (type == OverlayQuickKeyProfiles) {
+                m_QuickKeyPreviousRect = {};
+                m_QuickKeyNextRect = {};
+            }
         }
 
         notifyOverlayUpdated(type);
@@ -287,6 +297,8 @@ void OverlayManager::notifyOverlayUpdated(OverlayType type)
 SDL_Surface* OverlayManager::RenderQuickKeyOverlayThreePanel()
 {
     m_QuickKeyProfileRects.clear();
+    m_QuickKeyPreviousRect = {};
+    m_QuickKeyNextRect = {};
     if (m_UiFontData.isEmpty() || m_QuickKeyContent.profiles.isEmpty()) return nullptr;
 
     const QuickKeyOverlayLayout layout = QuickKeyOverlayLayout::calculate(
@@ -311,15 +323,15 @@ SDL_Surface* OverlayManager::RenderQuickKeyOverlayThreePanel()
                                  layout.profileRows.first().height();
     const int bindingRowHeight = layout.bindingRows.front().height();
     const int modeRowHeight = layout.leftModeSwitch.height();
-    TTF_Font* titleFont = openFont(std::max(20, static_cast<int>(28 * layout.scale)), true);
+    TTF_Font* titleFont = openFont(std::max(24, static_cast<int>(32 * layout.scale)), true);
     TTF_Font* bodyFont = openFont(std::max(6, std::min(
-        static_cast<int>(17 * layout.scale), profileRowHeight - 2)));
+        static_cast<int>(19 * layout.scale), profileRowHeight - 2)));
     TTF_Font* actionFont = openFont(std::max(6, std::min(
-        static_cast<int>(16 * layout.scale), bindingRowHeight - 2)), true);
-    TTF_Font* smallFont = openFont(std::max(10, static_cast<int>(13 * layout.scale)));
+        static_cast<int>(18 * layout.scale), bindingRowHeight - 2)), true);
+    TTF_Font* smallFont = openFont(std::max(11, static_cast<int>(15 * layout.scale)));
     TTF_Font* modeFont = openFont(std::max(5, std::min(
-        static_cast<int>(12 * layout.scale), modeRowHeight - 2)), true);
-    TTF_Font* sectionFont = openFont(std::max(10, static_cast<int>(13 * layout.scale)), true);
+        static_cast<int>(13 * layout.scale), modeRowHeight - 2)), true);
+    TTF_Font* sectionFont = openFont(std::max(12, static_cast<int>(15 * layout.scale)), true);
     if (!titleFont || !bodyFont || !actionFont || !smallFont || !modeFont || !sectionFont) {
         TTF_CloseFont(titleFont);
         TTF_CloseFont(bodyFont);
@@ -332,19 +344,21 @@ SDL_Surface* OverlayManager::RenderQuickKeyOverlayThreePanel()
     }
 
     const SDL_Color shadow{0, 0, 0, 140};
-    const SDL_Color border{68, 74, 82, 255};       // #444A52
-    const SDL_Color background{24, 26, 29, 248};   // #181A1D
-    const SDL_Color chrome{32, 35, 40, 255};       // #202328
-    const SDL_Color card{36, 39, 44, 255};         // #24272C
-    const SDL_Color alternate{43, 47, 53, 255};    // #2B2F35
-    const SDL_Color primary{243, 244, 246, 255};   // #F3F4F6
-    const SDL_Color secondary{183, 188, 196, 255}; // #B7BCC4
-    const SDL_Color blue{59, 130, 246, 255};       // #3B82F6
-    const SDL_Color selected{38, 59, 85, 255};     // #263B55
-    const SDL_Color green{78, 203, 141, 255};      // #4ECB8D
-    const SDL_Color amber{242, 193, 78, 255};      // #F2C14E
-    const SDL_Color violet{167, 139, 250, 255};    // #A78BFA
-    const SDL_Color badge{52, 56, 63, 255};
+    // Every palette entry is fully desaturated. This also keeps the UI neutral
+    // on overlay renderers that expose a different red/blue channel ordering.
+    const SDL_Color border{72, 72, 72, 255};
+    const SDL_Color background{20, 20, 20, 248};
+    const SDL_Color chrome{28, 28, 28, 255};
+    const SDL_Color card{35, 35, 35, 255};
+    const SDL_Color alternate{43, 43, 43, 255};
+    const SDL_Color primary{244, 244, 244, 255};
+    const SDL_Color secondary{184, 184, 184, 255};
+    const SDL_Color selectionAccent{232, 232, 232, 255};
+    const SDL_Color selected{64, 64, 64, 255};
+    const SDL_Color activeMark{208, 208, 208, 255};
+    const SDL_Color favoriteMark{174, 174, 174, 255};
+    const SDL_Color customMark{142, 142, 142, 255};
+    const SDL_Color badge{52, 52, 52, 255};
 
     auto asSdlRect = [](const QRect& rect) {
         return SDL_Rect{rect.x(), rect.y(), rect.width(), rect.height()};
@@ -367,6 +381,16 @@ SDL_Surface* OverlayManager::RenderQuickKeyOverlayThreePanel()
                            radius * 2 - 1, radius * 2 + 1}, color);
         fillRect(surface, {centerX - radius, centerY - radius + 1,
                            radius * 2 + 1, radius * 2 - 1}, color);
+    };
+    auto drawArrow = [surface](const QRect& rect, bool up, SDL_Color color) {
+        const int radius = std::max(4, std::min(rect.height() / 4, rect.width() / 16));
+        const int centerX = rect.center().x();
+        const int centerY = rect.center().y();
+        for (int line = 0; line <= radius; ++line) {
+            const int halfWidth = up ? line : radius - line;
+            const int y = centerY - radius / 2 + line;
+            fillRect(surface, {centerX - halfWidth, y, halfWidth * 2 + 1, 1}, color);
+        }
     };
 
     fillRect(surface, {layout.shadowSize, layout.shadowSize,
@@ -394,9 +418,9 @@ SDL_Surface* OverlayManager::RenderQuickKeyOverlayThreePanel()
     const QRect activeBadge(layout.panelWidth - layout.padding - activeWidth,
                             titleY + std::max(2, static_cast<int>(4 * layout.scale)),
                             activeWidth, activeHeight);
-    fillRect(surface, asSdlRect(activeBadge), {38, 55, 48, 255});
-    strokeRect(activeBadge, green);
-    drawText(surface, sectionFont, activeLabel, green,
+    fillRect(surface, asSdlRect(activeBadge), {40, 40, 40, 255});
+    strokeRect(activeBadge, activeMark);
+    drawText(surface, sectionFont, activeLabel, activeMark,
              activeBadge.x() + activePad,
              activeBadge.y() + (activeBadge.height() - TTF_FontHeight(sectionFont)) / 2,
              activeBadge.width() - activePad * 2);
@@ -410,13 +434,15 @@ SDL_Surface* OverlayManager::RenderQuickKeyOverlayThreePanel()
     const int headingY = layout.leftPanel.y() +
                          (layout.sectionHeight - TTF_FontHeight(sectionFont)) / 2;
     const int headingPad = std::max(8, static_cast<int>(11 * layout.scale));
-    drawText(surface, sectionFont, QStringLiteral("LEFT QUICKKEYS · F1–F5"), secondary,
+    drawText(surface, sectionFont,
+             layout.compact ? QStringLiteral("F1–F5") : QStringLiteral("LEFT QUICKKEYS · F1–F5"), secondary,
              layout.leftPanel.x() + headingPad, headingY,
              layout.leftPanel.width() - headingPad * 2);
     drawText(surface, sectionFont, QStringLiteral("PRESETS"), secondary,
              layout.presetPanel.x() + headingPad, headingY,
              layout.presetPanel.width() - headingPad * 2);
-    drawText(surface, sectionFont, QStringLiteral("RIGHT QUICKKEYS · F6–F10"), secondary,
+    drawText(surface, sectionFont,
+             layout.compact ? QStringLiteral("F6–F10") : QStringLiteral("RIGHT QUICKKEYS · F6–F10"), secondary,
              layout.rightPanel.x() + headingPad, headingY,
              layout.rightPanel.width() - headingPad * 2);
 
@@ -430,6 +456,16 @@ SDL_Surface* OverlayManager::RenderQuickKeyOverlayThreePanel()
                  layout.presetPanel.y() + (layout.sectionHeight - TTF_FontHeight(smallFont)) / 2);
     }
 
+    m_QuickKeyPreviousRect = asSdlRect(layout.profileUpButton);
+    m_QuickKeyNextRect = asSdlRect(layout.profileDownButton);
+    auto drawNavigationButton = [&](const QRect& rect, bool up) {
+        fillRect(surface, asSdlRect(rect), alternate);
+        strokeRect(rect, border);
+        drawArrow(rect, up, selectionAccent);
+    };
+    drawNavigationButton(layout.profileUpButton, true);
+    drawNavigationButton(layout.profileDownButton, false);
+
     for (int row = 0; row < m_QuickKeyContent.profiles.size() &&
                             row < layout.profileRows.size(); ++row) {
         const auto& profile = m_QuickKeyContent.profiles[row];
@@ -439,7 +475,7 @@ SDL_Surface* OverlayManager::RenderQuickKeyOverlayThreePanel()
         if (profile.selected) {
             fillRect(surface, rowRect, selected);
             fillRect(surface, {rowRect.x, rowRect.y,
-                               std::max(3, static_cast<int>(4 * layout.scale)), rowRect.h}, blue);
+                               std::max(3, static_cast<int>(4 * layout.scale)), rowRect.h}, selectionAccent);
         } else if (row % 2) {
             fillRect(surface, rowRect, alternate);
         }
@@ -452,10 +488,10 @@ SDL_Surface* OverlayManager::RenderQuickKeyOverlayThreePanel()
         }
         const int favoriteX = rowRect.x + std::max(20, static_cast<int>(24 * layout.scale));
         if (profile.favorite)
-            drawDiamond(favoriteX, centerY, std::max(3, static_cast<int>(4 * layout.scale)), amber);
+            drawDiamond(favoriteX, centerY, std::max(3, static_cast<int>(4 * layout.scale)), favoriteMark);
         const int activeX = rowRect.x + std::max(37, static_cast<int>(44 * layout.scale));
         if (profile.active)
-            drawDot(activeX, centerY, std::max(3, static_cast<int>(4 * layout.scale)), green);
+            drawDot(activeX, centerY, std::max(3, static_cast<int>(4 * layout.scale)), activeMark);
         const int nameX = rowRect.x + std::max(51, static_cast<int>(60 * layout.scale));
         drawText(surface, bodyFont, profile.name, primary, nameX,
                  rowRect.y + (rowRect.h - TTF_FontHeight(bodyFont)) / 2,
@@ -470,6 +506,8 @@ SDL_Surface* OverlayManager::RenderQuickKeyOverlayThreePanel()
 
     auto drawModeSwitch = [&](const QRect& rect) {
         fillRect(surface, asSdlRect(rect), chrome);
+        fillRect(surface, {rect.x(), rect.y(), rect.width(), 1}, border);
+        fillRect(surface, {rect.x(), rect.bottom(), rect.width(), 1}, border);
         const QString label = rect.width() >= 260 ?
                                   QStringLiteral("MODE SWITCH · HARDWARE ONLY") :
                                   QStringLiteral("MODE · HW ONLY");
@@ -488,21 +526,52 @@ SDL_Surface* OverlayManager::RenderQuickKeyOverlayThreePanel()
         const QuickKeyBindingRow* binding = bindingIndex >= 0 ?
                                                 &m_QuickKeyContent.bindings[bindingIndex] : nullptr;
         const QRect& qRow = layout.bindingRows[slot];
-        const SDL_Rect rowRect = asSdlRect(qRow);
+        const int cardInsetX = std::max(5, static_cast<int>(7 * layout.scale));
+        const int cardInsetY = std::max(2, static_cast<int>(3 * layout.scale));
+        const QRect cardRect(qRow.x() + cardInsetX, qRow.y() + cardInsetY,
+                             std::max(1, qRow.width() - cardInsetX * 2),
+                             std::max(1, qRow.height() - cardInsetY * 2));
+        const SDL_Rect rowRect = asSdlRect(cardRect);
         const int localSlot = slot % QuickKeyOverlayLayout::BindingsPerSide;
-        if (localSlot % 2) fillRect(surface, rowRect, alternate);
+        fillRect(surface, rowRect, localSlot % 2 ? alternate : card);
+        strokeRect(cardRect, border);
         if (binding && binding->modified) {
             fillRect(surface, {rowRect.x, rowRect.y,
-                               std::max(3, static_cast<int>(4 * layout.scale)), rowRect.h}, violet);
+                               std::max(3, static_cast<int>(4 * layout.scale)), rowRect.h}, customMark);
         }
 
-        const int rowPad = std::max(6, static_cast<int>(9 * layout.scale));
-        const int badgeWidth = std::max(1, std::min(rowRect.w / 4,
-                                                    std::max(42, static_cast<int>(58 * layout.scale))));
+        const int rowPad = std::max(7, static_cast<int>(10 * layout.scale));
+        const int badgeWidth = layout.compact ?
+            std::max(1, std::min(rowRect.w - rowPad * 2,
+                                 std::max(46, static_cast<int>(52 * layout.scale)))) :
+            std::max(1, std::min(rowRect.w / 4,
+                                 std::max(42, static_cast<int>(58 * layout.scale))));
         const int badgeHeight = std::max(1, std::min(std::max(1, rowRect.h - 8),
                                                      std::max(23, static_cast<int>(30 * layout.scale))));
+        QString actionName = binding && !binding->actionName.isEmpty() ?
+                                 binding->actionName : QStringLiteral("Unassigned");
+        if (binding && binding->modified) actionName += QStringLiteral("  [CUSTOM]");
+        const int actionHeight = TTF_FontHeight(actionFont);
+        const int stackGap = layout.compact ? std::max(4, static_cast<int>(6 * layout.scale)) : 0;
+        const int candidateActionX = layout.compact ? rowRect.x + rowPad :
+                                                      rowRect.x + rowPad + badgeWidth + rowPad;
+        const int candidateActionWidth = std::max(
+            1, rowRect.x + rowRect.w - candidateActionX - rowPad);
+        const int detailsGap = std::max(3, static_cast<int>(4 * layout.scale));
+        const int detailsHeight = TTF_FontHeight(smallFont);
+        const int requiredHeightWithDetails = layout.compact ?
+            badgeHeight + stackGap + actionHeight + detailsGap + detailsHeight + rowPad :
+            std::max(badgeHeight, actionHeight + detailsGap + detailsHeight) + rowPad;
+        const bool showDetails = binding && !binding->actionDetails.isEmpty() &&
+                                 candidateActionWidth >= 70 && rowRect.h >= requiredHeightWithDetails;
+        const int detailHeight = showDetails ? TTF_FontHeight(smallFont) : 0;
+        const int textGap = showDetails ? std::max(3, static_cast<int>(4 * layout.scale)) : 0;
+        const int textBlockHeight = actionHeight + textGap + detailHeight;
+        const int contentHeight = layout.compact ? badgeHeight + stackGap + textBlockHeight :
+                                                   std::max(badgeHeight, textBlockHeight);
+        const int contentY = rowRect.y + (rowRect.h - contentHeight) / 2;
         const QRect badgeRect(rowRect.x + rowPad,
-                              rowRect.y + (rowRect.h - badgeHeight) / 2,
+                              layout.compact ? contentY : rowRect.y + (rowRect.h - badgeHeight) / 2,
                               badgeWidth, badgeHeight);
         fillRect(surface, asSdlRect(badgeRect), badge);
         strokeRect(badgeRect, border);
@@ -516,21 +585,16 @@ SDL_Surface* OverlayManager::RenderQuickKeyOverlayThreePanel()
                  badgeRect.y() + (badgeRect.height() - TTF_FontHeight(actionFont)) / 2,
                  sourceArea);
 
-        const int actionX = badgeRect.right() + 1 + rowPad;
+        const int actionX = candidateActionX;
         const int actionWidth = std::max(1, rowRect.x + rowRect.w - actionX - rowPad);
-        QString actionName = binding && !binding->actionName.isEmpty() ?
-                                 binding->actionName : QStringLiteral("Unassigned");
-        if (binding && binding->modified) actionName += QStringLiteral("  [CUSTOM]");
-        const bool showDetails = layout.showActionDetails && binding &&
-                                 !binding->actionDetails.isEmpty() && rowRect.h >= 42;
+        const int textBlockY = layout.compact ? badgeRect.bottom() + 1 + stackGap :
+                                                rowRect.y + (rowRect.h - textBlockHeight) / 2;
         drawText(surface, actionFont, actionName, primary, actionX,
-                 showDetails ? rowRect.y + std::max(3, static_cast<int>(5 * layout.scale)) :
-                               rowRect.y + (rowRect.h - TTF_FontHeight(actionFont)) / 2,
+                 textBlockY,
                  actionWidth);
         if (showDetails) {
             drawText(surface, smallFont, binding->actionDetails, secondary, actionX,
-                     rowRect.y + rowRect.h - TTF_FontHeight(smallFont) -
-                         std::max(3, static_cast<int>(5 * layout.scale)),
+                     textBlockY + actionHeight + textGap,
                      actionWidth);
         }
     }
@@ -555,15 +619,15 @@ SDL_Surface* OverlayManager::RenderQuickKeyOverlayThreePanel()
         int x = layout.panelWidth - layout.padding - legendWidth;
         const int textY = footerY + (layout.footerHeight - TTF_FontHeight(smallFont)) / 2;
         const int centerY = footerY + layout.footerHeight / 2;
-        drawDiamond(x + 4, centerY, 4, amber);
+        drawDiamond(x + 4, centerY, 4, favoriteMark);
         x += markerGap;
         drawText(surface, smallFont, favoriteLabel, secondary, x, textY);
         x += textWidth(smallFont, favoriteLabel) + gap;
-        drawDot(x + 4, centerY, 4, green);
+        drawDot(x + 4, centerY, 4, activeMark);
         x += markerGap;
         drawText(surface, smallFont, activeText, secondary, x, textY);
         x += textWidth(smallFont, activeText) + gap;
-        fillRect(surface, {x, centerY - 6, 3, 12}, violet);
+        fillRect(surface, {x, centerY - 6, 3, 12}, customMark);
         x += markerGap;
         drawText(surface, smallFont, customText, secondary, x, textY);
     }
@@ -605,10 +669,10 @@ SDL_Surface* OverlayManager::RenderQuickKeyToast()
     SDL_SetSurfaceBlendMode(surface, SDL_BLENDMODE_BLEND);
     SDL_FillRect(surface, nullptr, SDL_MapRGBA(surface->format, 0, 0, 0, 0));
     fillRect(surface, {shadowSize, shadowSize, width, height}, {0, 0, 0, 140});
-    fillRect(surface, {0, 0, width, height}, {68, 74, 82, 255});
-    fillRect(surface, {1, 1, width - 2, height - 2}, {32, 35, 40, 250});
-    fillRect(surface, {1, 1, accentWidth, height - 2}, {78, 203, 141, 255});
-    drawText(surface, font, text, {243, 244, 246, 255},
+    fillRect(surface, {0, 0, width, height}, {72, 72, 72, 255});
+    fillRect(surface, {1, 1, width - 2, height - 2}, {28, 28, 28, 250});
+    fillRect(surface, {1, 1, accentWidth, height - 2}, {208, 208, 208, 255});
+    drawText(surface, font, text, {244, 244, 244, 255},
              accentWidth + paddingX, paddingY);
     TTF_CloseFont(font);
     return surface;

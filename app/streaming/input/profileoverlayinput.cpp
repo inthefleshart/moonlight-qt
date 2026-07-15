@@ -150,6 +150,21 @@ void SdlInputHandler::renderProfileSelector()
     overlay.setOverlayState(Overlay::OverlayQuickKeyProfiles, true);
 }
 
+void SdlInputHandler::activateProfileSelectorTarget(int target)
+{
+    if (target >= 0) {
+        applySelectedProfile();
+    } else if (target == Overlay::QuickKeyProfileHitPrevious) {
+        m_ProfileSelector.moveSelection(-1);
+        renderProfileSelector();
+    } else if (target == Overlay::QuickKeyProfileHitNext) {
+        m_ProfileSelector.moveSelection(1);
+        renderProfileSelector();
+    } else {
+        closeProfileSelector();
+    }
+}
+
 void SdlInputHandler::showProfileToast(const QString& profile)
 {
     SDL_RemoveTimer(m_ProfileToastTimer);
@@ -277,7 +292,7 @@ bool SdlInputHandler::handleProfileSelectorMouseButton(SDL_MouseButtonEvent* eve
     } else {
         if (!m_ProfileSelectorPointerReady) updateProfileSelectorPointerReady();
         else if (m_ProfileSelectorPointerPressed) {
-            if (row >= 0 && row == m_ProfileSelectorPressedRow) applySelectedProfile();
+            if (row == m_ProfileSelectorPressedRow) activateProfileSelectorTarget(row);
             else closeProfileSelector();
         }
         m_ProfileSelectorPointerPressed = false;
@@ -319,7 +334,7 @@ bool SdlInputHandler::handleProfileSelectorTouch(SDL_TouchFingerEvent* event)
     } else if (event->type == SDL_FINGERUP) {
         if (!m_ProfileSelectorPointerReady) updateProfileSelectorPointerReady();
         else if (m_ProfileSelectorPointerPressed) {
-            if (row >= 0 && row == m_ProfileSelectorPressedRow) applySelectedProfile();
+            if (row == m_ProfileSelectorPressedRow) activateProfileSelectorTarget(row);
             else closeProfileSelector();
         }
         m_ProfileSelectorPointerPressed = false;
@@ -363,7 +378,7 @@ bool SdlInputHandler::handleNativeLocalPointer(uint8_t eventType, float x, float
         if (row >= 0 && m_ProfileSelector.setHoveredRow(row)) renderProfileSelector();
     } else if (eventType == LI_TOUCH_EVENT_UP) {
         if (m_ProfileSelectorPointerReady && m_ProfileSelectorPointerPressed) {
-            if (row >= 0 && row == m_ProfileSelectorPressedRow) applySelectedProfile();
+            if (row == m_ProfileSelectorPressedRow) activateProfileSelectorTarget(row);
             else closeProfileSelector();
         }
         m_ProfileSelectorPointerReady = true;

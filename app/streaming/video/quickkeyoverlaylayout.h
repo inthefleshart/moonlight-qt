@@ -34,6 +34,8 @@ struct QuickKeyOverlayLayout
     QRect rightPanel;
     QRect leftModeSwitch;
     QRect rightModeSwitch;
+    QRect profileUpButton;
+    QRect profileDownButton;
     std::array<QRect, BindingCount> bindingRows;
     QVector<QRect> profileRows;
 

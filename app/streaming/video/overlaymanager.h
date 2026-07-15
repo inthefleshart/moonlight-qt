@@ -15,6 +15,12 @@ enum OverlayType {
     OverlayMax
 };
 
+enum QuickKeyProfileHitTarget {
+    QuickKeyProfileHitNone = -1,
+    QuickKeyProfileHitPrevious = -2,
+    QuickKeyProfileHitNext = -3,
+};
+
 struct QuickKeyProfileRow
 {
     QString name;
@@ -100,6 +106,8 @@ private:
     QByteArray m_UiSemiboldFontData;
     QuickKeyOverlayContent m_QuickKeyContent;
     QVector<SDL_Rect> m_QuickKeyProfileRects;
+    SDL_Rect m_QuickKeyPreviousRect{};
+    SDL_Rect m_QuickKeyNextRect{};
     bool m_HasQuickKeyContent = false;
 };
 

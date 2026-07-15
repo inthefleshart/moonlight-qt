@@ -217,6 +217,7 @@ private:
     void applySelectedProfile();
     void cycleFavoriteProfile(int direction);
     void renderProfileSelector();
+    void activateProfileSelectorTarget(int target);
     void showProfileToast(const QString& profile);
     bool handleProfileSelectorKey(SDL_KeyboardEvent* event);
     bool handleProfileSelectorMouseButton(SDL_MouseButtonEvent* event);
