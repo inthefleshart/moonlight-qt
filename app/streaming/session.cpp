@@ -2051,6 +2051,11 @@ void Session::exec()
             case SDL_WINDOWEVENT_RESIZED:
                 m_InputHandler->refreshProfileSelectorOverlay();
                 break;
+#if SDL_VERSION_ATLEAST(2, 0, 18)
+            case SDL_WINDOWEVENT_DISPLAY_CHANGED:
+                m_InputHandler->refreshProfileSelectorOverlay();
+                break;
+#endif
             }
 
             presence.runCallbacks();
@@ -2288,6 +2293,7 @@ void Session::exec()
             m_InputHandler->handleTouchFingerEvent(&event.tfinger);
             break;
         case SDL_DISPLAYEVENT:
+            m_InputHandler->refreshProfileSelectorOverlay();
             switch (event.display.event) {
             case SDL_DISPLAYEVENT_CONNECTED:
             case SDL_DISPLAYEVENT_DISCONNECTED:

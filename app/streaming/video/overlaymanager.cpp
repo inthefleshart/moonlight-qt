@@ -1,5 +1,6 @@
 #include "overlaymanager.h"
 #include "path.h"
+#include "quickkeyoverlaylayout.h"
 
 #include <QFile>
 
@@ -57,11 +58,16 @@ OverlayManager::OverlayManager() :
     m_FontData(Path::readDataFile("ModeSeven.ttf"))
 {
 #ifdef Q_OS_WIN32
-    QFile uiFont(qEnvironmentVariable("WINDIR", QStringLiteral("C:/Windows")) +
-                 QStringLiteral("/Fonts/segoeui.ttf"));
+    const QString fontsPath = qEnvironmentVariable("WINDIR", QStringLiteral("C:/Windows")) +
+                              QStringLiteral("/Fonts/");
+    QFile uiFont(fontsPath + QStringLiteral("segoeui.ttf"));
     if (uiFont.open(QIODevice::ReadOnly)) m_UiFontData = uiFont.readAll();
+    QFile semiboldFont(fontsPath + QStringLiteral("seguisb.ttf"));
+    if (semiboldFont.open(QIODevice::ReadOnly))
+        m_UiSemiboldFontData = semiboldFont.readAll();
 #endif
     if (m_UiFontData.isEmpty()) m_UiFontData = m_FontData;
+    if (m_UiSemiboldFontData.isEmpty()) m_UiSemiboldFontData = m_UiFontData;
 
     memset(m_Overlays, 0, sizeof(m_Overlays));
 
@@ -129,6 +135,12 @@ void OverlayManager::updateQuickKeyOverlay(const QuickKeyOverlayContent& content
     m_QuickKeyContent = content;
     m_HasQuickKeyContent = true;
     setOverlayTextUpdated(OverlayQuickKeyProfiles);
+}
+
+void OverlayManager::setQuickKeyViewportSize(int width, int height)
+{
+    m_QuickKeyContent.viewportWidth = width;
+    m_QuickKeyContent.viewportHeight = height;
 }
 
 int OverlayManager::getOverlayMaxTextLength()
@@ -219,10 +231,11 @@ void OverlayManager::notifyOverlayUpdated(OverlayType type)
     }
 
     const bool renderQuickKeyPanel = type == OverlayQuickKeyProfiles && m_HasQuickKeyContent;
+    const bool renderQuickKeyToast = type == OverlayQuickKeyProfiles && !m_HasQuickKeyContent;
 
     // Construct the required font to render ordinary text overlays. The QuickKey
     // panel creates scaled UI fonts as part of its structured rendering path.
-    if (!renderQuickKeyPanel && m_Overlays[type].font == nullptr) {
+    if (!renderQuickKeyPanel && !renderQuickKeyToast && m_Overlays[type].font == nullptr) {
         const QByteArray& fontData = type == OverlayQuickKeyProfiles ? m_UiFontData : m_FontData;
         if (fontData.isEmpty()) {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
@@ -247,7 +260,8 @@ void OverlayManager::notifyOverlayUpdated(OverlayType type)
     // Exchange the old surface with the new one
     SDL_Surface* newSurface = nullptr;
     if (m_Overlays[type].enabled) {
-        newSurface = renderQuickKeyPanel ? RenderQuickKeyOverlay() :
+        newSurface = renderQuickKeyPanel ? RenderQuickKeyOverlayThreePanel() :
+            renderQuickKeyToast ? RenderQuickKeyToast() :
             // The _Wrapped variant is required for line breaks to work.
             RenderTextOutlinedWrapped(m_Overlays[type].font,
                                       m_Overlays[type].text,
@@ -268,6 +282,336 @@ void OverlayManager::notifyOverlayUpdated(OverlayType type)
     if (oldSurface != nullptr) {
         SDL_FreeSurface(oldSurface);
     }
+}
+
+SDL_Surface* OverlayManager::RenderQuickKeyOverlayThreePanel()
+{
+    m_QuickKeyProfileRects.clear();
+    if (m_UiFontData.isEmpty() || m_QuickKeyContent.profiles.isEmpty()) return nullptr;
+
+    const QuickKeyOverlayLayout layout = QuickKeyOverlayLayout::calculate(
+        m_QuickKeyContent.viewportWidth,
+        m_QuickKeyContent.viewportHeight,
+        static_cast<int>(m_QuickKeyContent.profiles.size()));
+    SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormat(
+        0, layout.panelWidth + layout.shadowSize, layout.panelHeight + layout.shadowSize,
+        32, SDL_PIXELFORMAT_RGBA32);
+    if (!surface) return nullptr;
+    SDL_SetSurfaceBlendMode(surface, SDL_BLENDMODE_BLEND);
+    SDL_FillRect(surface, nullptr, SDL_MapRGBA(surface->format, 0, 0, 0, 0));
+
+    auto openFont = [this](int size, bool semibold = false) {
+        const QByteArray& data = semibold ? m_UiSemiboldFontData : m_UiFontData;
+        TTF_Font* font = TTF_OpenFontRW(
+            SDL_RWFromConstMem(data.constData(), data.size()), 1, size);
+        if (font) TTF_SetFontHinting(font, TTF_HINTING_LIGHT);
+        return font;
+    };
+    const int profileRowHeight = layout.profileRows.isEmpty() ? 18 :
+                                 layout.profileRows.first().height();
+    const int bindingRowHeight = layout.bindingRows.front().height();
+    const int modeRowHeight = layout.leftModeSwitch.height();
+    TTF_Font* titleFont = openFont(std::max(20, static_cast<int>(28 * layout.scale)), true);
+    TTF_Font* bodyFont = openFont(std::max(6, std::min(
+        static_cast<int>(17 * layout.scale), profileRowHeight - 2)));
+    TTF_Font* actionFont = openFont(std::max(6, std::min(
+        static_cast<int>(16 * layout.scale), bindingRowHeight - 2)), true);
+    TTF_Font* smallFont = openFont(std::max(10, static_cast<int>(13 * layout.scale)));
+    TTF_Font* modeFont = openFont(std::max(5, std::min(
+        static_cast<int>(12 * layout.scale), modeRowHeight - 2)), true);
+    TTF_Font* sectionFont = openFont(std::max(10, static_cast<int>(13 * layout.scale)), true);
+    if (!titleFont || !bodyFont || !actionFont || !smallFont || !modeFont || !sectionFont) {
+        TTF_CloseFont(titleFont);
+        TTF_CloseFont(bodyFont);
+        TTF_CloseFont(actionFont);
+        TTF_CloseFont(smallFont);
+        TTF_CloseFont(modeFont);
+        TTF_CloseFont(sectionFont);
+        SDL_FreeSurface(surface);
+        return nullptr;
+    }
+
+    const SDL_Color shadow{0, 0, 0, 140};
+    const SDL_Color border{68, 74, 82, 255};       // #444A52
+    const SDL_Color background{24, 26, 29, 248};   // #181A1D
+    const SDL_Color chrome{32, 35, 40, 255};       // #202328
+    const SDL_Color card{36, 39, 44, 255};         // #24272C
+    const SDL_Color alternate{43, 47, 53, 255};    // #2B2F35
+    const SDL_Color primary{243, 244, 246, 255};   // #F3F4F6
+    const SDL_Color secondary{183, 188, 196, 255}; // #B7BCC4
+    const SDL_Color blue{59, 130, 246, 255};       // #3B82F6
+    const SDL_Color selected{38, 59, 85, 255};     // #263B55
+    const SDL_Color green{78, 203, 141, 255};      // #4ECB8D
+    const SDL_Color amber{242, 193, 78, 255};      // #F2C14E
+    const SDL_Color violet{167, 139, 250, 255};    // #A78BFA
+    const SDL_Color badge{52, 56, 63, 255};
+
+    auto asSdlRect = [](const QRect& rect) {
+        return SDL_Rect{rect.x(), rect.y(), rect.width(), rect.height()};
+    };
+    auto strokeRect = [&](const QRect& rect, SDL_Color color) {
+        fillRect(surface, {rect.x(), rect.y(), rect.width(), 1}, color);
+        fillRect(surface, {rect.x(), rect.bottom(), rect.width(), 1}, color);
+        fillRect(surface, {rect.x(), rect.y(), 1, rect.height()}, color);
+        fillRect(surface, {rect.right(), rect.y(), 1, rect.height()}, color);
+    };
+    auto drawDiamond = [surface](int centerX, int centerY, int radius, SDL_Color color) {
+        for (int offset = -radius; offset <= radius; ++offset) {
+            const int halfWidth = radius - std::abs(offset);
+            fillRect(surface, {centerX - halfWidth, centerY + offset,
+                               halfWidth * 2 + 1, 1}, color);
+        }
+    };
+    auto drawDot = [surface](int centerX, int centerY, int radius, SDL_Color color) {
+        fillRect(surface, {centerX - radius + 1, centerY - radius,
+                           radius * 2 - 1, radius * 2 + 1}, color);
+        fillRect(surface, {centerX - radius, centerY - radius + 1,
+                           radius * 2 + 1, radius * 2 - 1}, color);
+    };
+
+    fillRect(surface, {layout.shadowSize, layout.shadowSize,
+                       layout.panelWidth, layout.panelHeight}, shadow);
+    fillRect(surface, {0, 0, layout.panelWidth, layout.panelHeight}, border);
+    fillRect(surface, {2, 2, layout.panelWidth - 4, layout.panelHeight - 4}, background);
+    fillRect(surface, {2, 2, layout.panelWidth - 4, layout.headerHeight - 2}, chrome);
+    fillRect(surface, {2, layout.panelHeight - layout.footerHeight,
+                       layout.panelWidth - 4, layout.footerHeight - 2}, chrome);
+
+    const int titleY = std::max(9, static_cast<int>(13 * layout.scale));
+    drawText(surface, titleFont, QStringLiteral("QuickKey Presets"), primary,
+             layout.padding, titleY, static_cast<int>(layout.panelWidth * 0.55f));
+    drawText(surface, smallFont,
+             QStringLiteral("Mappings for: %1").arg(m_QuickKeyContent.selectedProfile),
+             secondary, layout.padding,
+             titleY + TTF_FontHeight(titleFont) + std::max(2, static_cast<int>(4 * layout.scale)),
+             static_cast<int>(layout.panelWidth * 0.60f));
+
+    const QString activeLabel = QStringLiteral("ACTIVE  %1").arg(m_QuickKeyContent.activeProfile);
+    const int activePad = std::max(9, static_cast<int>(12 * layout.scale));
+    const int activeHeight = TTF_FontHeight(sectionFont) + std::max(8, static_cast<int>(10 * layout.scale));
+    const int activeWidth = std::min(layout.panelWidth / 3,
+                                     textWidth(sectionFont, activeLabel) + activePad * 2);
+    const QRect activeBadge(layout.panelWidth - layout.padding - activeWidth,
+                            titleY + std::max(2, static_cast<int>(4 * layout.scale)),
+                            activeWidth, activeHeight);
+    fillRect(surface, asSdlRect(activeBadge), {38, 55, 48, 255});
+    strokeRect(activeBadge, green);
+    drawText(surface, sectionFont, activeLabel, green,
+             activeBadge.x() + activePad,
+             activeBadge.y() + (activeBadge.height() - TTF_FontHeight(sectionFont)) / 2,
+             activeBadge.width() - activePad * 2);
+
+    for (const QRect& panel : {layout.leftPanel, layout.presetPanel, layout.rightPanel}) {
+        fillRect(surface, asSdlRect(panel), card);
+        strokeRect(panel, border);
+        fillRect(surface, {panel.x(), panel.y() + layout.sectionHeight - 1,
+                           panel.width(), 1}, border);
+    }
+    const int headingY = layout.leftPanel.y() +
+                         (layout.sectionHeight - TTF_FontHeight(sectionFont)) / 2;
+    const int headingPad = std::max(8, static_cast<int>(11 * layout.scale));
+    drawText(surface, sectionFont, QStringLiteral("LEFT QUICKKEYS · F1–F5"), secondary,
+             layout.leftPanel.x() + headingPad, headingY,
+             layout.leftPanel.width() - headingPad * 2);
+    drawText(surface, sectionFont, QStringLiteral("PRESETS"), secondary,
+             layout.presetPanel.x() + headingPad, headingY,
+             layout.presetPanel.width() - headingPad * 2);
+    drawText(surface, sectionFont, QStringLiteral("RIGHT QUICKKEYS · F6–F10"), secondary,
+             layout.rightPanel.x() + headingPad, headingY,
+             layout.rightPanel.width() - headingPad * 2);
+
+    const QString pageLabel = QStringLiteral("%1–%2 OF %3")
+        .arg(m_QuickKeyContent.firstVisibleIndex + 1)
+        .arg(m_QuickKeyContent.firstVisibleIndex + m_QuickKeyContent.profiles.size())
+        .arg(m_QuickKeyContent.totalProfiles);
+    if (layout.presetPanel.width() >= 320) {
+        drawText(surface, smallFont, pageLabel, secondary,
+                 layout.presetPanel.right() - headingPad - textWidth(smallFont, pageLabel),
+                 layout.presetPanel.y() + (layout.sectionHeight - TTF_FontHeight(smallFont)) / 2);
+    }
+
+    for (int row = 0; row < m_QuickKeyContent.profiles.size() &&
+                            row < layout.profileRows.size(); ++row) {
+        const auto& profile = m_QuickKeyContent.profiles[row];
+        const QRect& qRow = layout.profileRows[row];
+        const SDL_Rect rowRect = asSdlRect(qRow);
+        m_QuickKeyProfileRects.append(rowRect);
+        if (profile.selected) {
+            fillRect(surface, rowRect, selected);
+            fillRect(surface, {rowRect.x, rowRect.y,
+                               std::max(3, static_cast<int>(4 * layout.scale)), rowRect.h}, blue);
+        } else if (row % 2) {
+            fillRect(surface, rowRect, alternate);
+        }
+
+        const int centerY = rowRect.y + rowRect.h / 2;
+        if (profile.selected) {
+            drawText(surface, sectionFont, QStringLiteral(">"), primary,
+                     rowRect.x + std::max(5, static_cast<int>(7 * layout.scale)),
+                     rowRect.y + (rowRect.h - TTF_FontHeight(sectionFont)) / 2);
+        }
+        const int favoriteX = rowRect.x + std::max(20, static_cast<int>(24 * layout.scale));
+        if (profile.favorite)
+            drawDiamond(favoriteX, centerY, std::max(3, static_cast<int>(4 * layout.scale)), amber);
+        const int activeX = rowRect.x + std::max(37, static_cast<int>(44 * layout.scale));
+        if (profile.active)
+            drawDot(activeX, centerY, std::max(3, static_cast<int>(4 * layout.scale)), green);
+        const int nameX = rowRect.x + std::max(51, static_cast<int>(60 * layout.scale));
+        drawText(surface, bodyFont, profile.name, primary, nameX,
+                 rowRect.y + (rowRect.h - TTF_FontHeight(bodyFont)) / 2,
+                 rowRect.x + rowRect.w - nameX - headingPad);
+    }
+
+    QVector<int> bindingSlots;
+    bindingSlots.reserve(m_QuickKeyContent.bindings.size());
+    for (const auto& binding : m_QuickKeyContent.bindings)
+        bindingSlots.append(binding.slot);
+    const auto bindingIndexes = QuickKeyOverlayLayout::bindingIndexesBySlot(bindingSlots);
+
+    auto drawModeSwitch = [&](const QRect& rect) {
+        fillRect(surface, asSdlRect(rect), chrome);
+        const QString label = rect.width() >= 260 ?
+                                  QStringLiteral("MODE SWITCH · HARDWARE ONLY") :
+                                  QStringLiteral("MODE · HW ONLY");
+        const int labelArea = std::max(1, rect.width() - headingPad * 2);
+        const int labelWidth = std::min(textWidth(modeFont, label), labelArea);
+        drawText(surface, modeFont, label, secondary,
+                 rect.x() + (rect.width() - labelWidth) / 2,
+                 rect.y() + (rect.height() - TTF_FontHeight(modeFont)) / 2,
+                 labelArea);
+    };
+    drawModeSwitch(layout.leftModeSwitch);
+    drawModeSwitch(layout.rightModeSwitch);
+
+    for (int slot = 0; slot < QuickKeyOverlayLayout::BindingCount; ++slot) {
+        const int bindingIndex = bindingIndexes[slot];
+        const QuickKeyBindingRow* binding = bindingIndex >= 0 ?
+                                                &m_QuickKeyContent.bindings[bindingIndex] : nullptr;
+        const QRect& qRow = layout.bindingRows[slot];
+        const SDL_Rect rowRect = asSdlRect(qRow);
+        const int localSlot = slot % QuickKeyOverlayLayout::BindingsPerSide;
+        if (localSlot % 2) fillRect(surface, rowRect, alternate);
+        if (binding && binding->modified) {
+            fillRect(surface, {rowRect.x, rowRect.y,
+                               std::max(3, static_cast<int>(4 * layout.scale)), rowRect.h}, violet);
+        }
+
+        const int rowPad = std::max(6, static_cast<int>(9 * layout.scale));
+        const int badgeWidth = std::max(1, std::min(rowRect.w / 4,
+                                                    std::max(42, static_cast<int>(58 * layout.scale))));
+        const int badgeHeight = std::max(1, std::min(std::max(1, rowRect.h - 8),
+                                                     std::max(23, static_cast<int>(30 * layout.scale))));
+        const QRect badgeRect(rowRect.x + rowPad,
+                              rowRect.y + (rowRect.h - badgeHeight) / 2,
+                              badgeWidth, badgeHeight);
+        fillRect(surface, asSdlRect(badgeRect), badge);
+        strokeRect(badgeRect, border);
+        const QString fallbackSource = QStringLiteral("F%1").arg(slot + 1);
+        const QString source = binding && !binding->source.isEmpty() ?
+                                   binding->source : fallbackSource;
+        const int sourceArea = std::max(1, badgeRect.width() - 4);
+        const int sourceWidth = std::min(textWidth(actionFont, source), sourceArea);
+        drawText(surface, actionFont, source, primary,
+                 badgeRect.x() + (badgeRect.width() - sourceWidth) / 2,
+                 badgeRect.y() + (badgeRect.height() - TTF_FontHeight(actionFont)) / 2,
+                 sourceArea);
+
+        const int actionX = badgeRect.right() + 1 + rowPad;
+        const int actionWidth = std::max(1, rowRect.x + rowRect.w - actionX - rowPad);
+        QString actionName = binding && !binding->actionName.isEmpty() ?
+                                 binding->actionName : QStringLiteral("Unassigned");
+        if (binding && binding->modified) actionName += QStringLiteral("  [CUSTOM]");
+        const bool showDetails = layout.showActionDetails && binding &&
+                                 !binding->actionDetails.isEmpty() && rowRect.h >= 42;
+        drawText(surface, actionFont, actionName, primary, actionX,
+                 showDetails ? rowRect.y + std::max(3, static_cast<int>(5 * layout.scale)) :
+                               rowRect.y + (rowRect.h - TTF_FontHeight(actionFont)) / 2,
+                 actionWidth);
+        if (showDetails) {
+            drawText(surface, smallFont, binding->actionDetails, secondary, actionX,
+                     rowRect.y + rowRect.h - TTF_FontHeight(smallFont) -
+                         std::max(3, static_cast<int>(5 * layout.scale)),
+                     actionWidth);
+        }
+    }
+
+    const int footerY = layout.panelHeight - layout.footerHeight;
+    const QString instructions = QStringLiteral(
+        "Arrow keys / wheel  Navigate     Enter / tap  Select     Esc  Cancel");
+    drawText(surface, smallFont, instructions, primary, layout.padding,
+             footerY + (layout.footerHeight - TTF_FontHeight(smallFont)) / 2,
+             layout.compact ? layout.panelWidth - layout.padding * 2 :
+                              static_cast<int>(layout.panelWidth * 0.62f));
+
+    if (!layout.compact) {
+        const QString favoriteLabel = QStringLiteral("Favorite");
+        const QString activeText = QStringLiteral("Active");
+        const QString customText = QStringLiteral("Custom");
+        const int gap = std::max(12, static_cast<int>(16 * layout.scale));
+        const int markerGap = std::max(7, static_cast<int>(9 * layout.scale));
+        const int legendWidth = textWidth(smallFont, favoriteLabel) +
+                                textWidth(smallFont, activeText) +
+                                textWidth(smallFont, customText) + gap * 2 + markerGap * 3 + 18;
+        int x = layout.panelWidth - layout.padding - legendWidth;
+        const int textY = footerY + (layout.footerHeight - TTF_FontHeight(smallFont)) / 2;
+        const int centerY = footerY + layout.footerHeight / 2;
+        drawDiamond(x + 4, centerY, 4, amber);
+        x += markerGap;
+        drawText(surface, smallFont, favoriteLabel, secondary, x, textY);
+        x += textWidth(smallFont, favoriteLabel) + gap;
+        drawDot(x + 4, centerY, 4, green);
+        x += markerGap;
+        drawText(surface, smallFont, activeText, secondary, x, textY);
+        x += textWidth(smallFont, activeText) + gap;
+        fillRect(surface, {x, centerY - 6, 3, 12}, violet);
+        x += markerGap;
+        drawText(surface, smallFont, customText, secondary, x, textY);
+    }
+
+    TTF_CloseFont(titleFont);
+    TTF_CloseFont(bodyFont);
+    TTF_CloseFont(actionFont);
+    TTF_CloseFont(smallFont);
+    TTF_CloseFont(modeFont);
+    TTF_CloseFont(sectionFont);
+    return surface;
+}
+
+SDL_Surface* OverlayManager::RenderQuickKeyToast()
+{
+    if (m_UiSemiboldFontData.isEmpty() || m_Overlays[OverlayQuickKeyProfiles].text[0] == '\0')
+        return nullptr;
+
+    const int viewportHeight = std::max(1, m_QuickKeyContent.viewportHeight);
+    const float scale = std::clamp(viewportHeight / 1440.0f, 0.78f, 1.50f);
+    TTF_Font* font = TTF_OpenFontRW(
+        SDL_RWFromConstMem(m_UiSemiboldFontData.constData(), m_UiSemiboldFontData.size()),
+        1, std::max(16, static_cast<int>(20 * scale)));
+    if (!font) return nullptr;
+    TTF_SetFontHinting(font, TTF_HINTING_LIGHT);
+    const QString text = QString::fromUtf8(m_Overlays[OverlayQuickKeyProfiles].text);
+    const int paddingX = std::max(18, static_cast<int>(24 * scale));
+    const int paddingY = std::max(10, static_cast<int>(14 * scale));
+    const int accentWidth = std::max(4, static_cast<int>(5 * scale));
+    const int shadowSize = std::max(5, static_cast<int>(7 * scale));
+    const int width = textWidth(font, text) + paddingX * 2 + accentWidth;
+    const int height = TTF_FontHeight(font) + paddingY * 2;
+    SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormat(
+        0, width + shadowSize, height + shadowSize, 32, SDL_PIXELFORMAT_RGBA32);
+    if (!surface) {
+        TTF_CloseFont(font);
+        return nullptr;
+    }
+    SDL_SetSurfaceBlendMode(surface, SDL_BLENDMODE_BLEND);
+    SDL_FillRect(surface, nullptr, SDL_MapRGBA(surface->format, 0, 0, 0, 0));
+    fillRect(surface, {shadowSize, shadowSize, width, height}, {0, 0, 0, 140});
+    fillRect(surface, {0, 0, width, height}, {68, 74, 82, 255});
+    fillRect(surface, {1, 1, width - 2, height - 2}, {32, 35, 40, 250});
+    fillRect(surface, {1, 1, accentWidth, height - 2}, {78, 203, 141, 255});
+    drawText(surface, font, text, {243, 244, 246, 255},
+             accentWidth + paddingX, paddingY);
+    TTF_CloseFont(font);
+    return surface;
 }
 
 SDL_Surface* OverlayManager::RenderQuickKeyOverlay()

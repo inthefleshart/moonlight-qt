@@ -39,9 +39,13 @@ Press **Ctrl+Alt+Shift+P** during an active stream to open the local QuickKey pr
 - A gold marker identifies presets included in the Next/Previous favorite rotation.
 - Moonlight releases held remote pen, touch, mouse, QuickKey, keyboard, and controller input before changing profiles.
 
-The popup's left pane lists presets and marks the highlighted, active, and favorite states. Its **QuickKey Reference** pane updates as the highlight moves and displays all ten source buttons, friendly action names, shortcuts, holds, and pen-drag gestures for that profile. A blue edge marks a user-customized binding. Previewing a profile does not activate it or discard any customizations.
+The popup mirrors the physical controls with three panels: F1–F5 mappings on the left, the alphabetized preset list in the middle, and F6–F10 mappings on the right. A labeled **Mode Switch · hardware only** spacer appears between F2/F3 and F7/F8. Highlighting a preset immediately previews all ten friendly action names, shortcuts, holds, sequences, and pen-drag gestures without activating it or discarding customizations. Blue marks the current selection, green the active preset, gold a favorite, and violet plus a **CUSTOM** label a modified binding.
+
+The popup uses a greyscale dark theme and the Windows Segoe UI family. Its colored markers communicate state, while selection chevrons, marker shapes, and text labels keep the same information understandable without relying on color alone. Secondary shortcut details are hidden before action names when the stream window is too narrow.
 
 Use **In-stream favorites…** in Input Settings to enable and reorder the profiles used by **Next favorite QuickKey preset** and **Previous favorite QuickKey preset**. The selector itself always lists every preset alphabetically. The common-action chooser can assign the selector and both cycle actions to any physical QuickKey; no shipped mapping is replaced automatically.
+
+The pre-three-panel selector is preserved in Git history at commit `b155860b` on `codex/wacom-remote`.
 
 ## Shipped profiles
 

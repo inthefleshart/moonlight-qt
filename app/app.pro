@@ -192,6 +192,7 @@ SOURCES += \
     streaming/input/tabletprofileselector.cpp \
     streaming/input/profileoverlayinput.cpp \
     streaming/input/pointerhistory.cpp \
+    streaming/video/quickkeyoverlaylayout.cpp \
     streaming/input/gamepad.cpp \
     streaming/input/input.cpp \
     streaming/input/keyboard.cpp \
@@ -246,6 +247,7 @@ HEADERS += \
     gui/computermodel.h \
     gui/appmodel.h \
     streaming/video/decoder.h \
+    streaming/video/quickkeyoverlaylayout.h \
     streaming/bandwidth.h \
     streaming/streamutils.h \
     backend/autoupdatechecker.h \

@@ -142,7 +142,7 @@ void SdlInputHandler::renderProfileSelector()
             details.remove(0, namePrefix.size());
         else if (details == action.name || action.kind == TabletActionKind::Disabled)
             details.clear();
-        content.bindings.append({source.displayText(), action.name, details, action.modified});
+        content.bindings.append({source.displayText(), action.name, details, action.modified, slot});
     }
 
     auto& overlay = Session::get()->getOverlayManager();
@@ -156,6 +156,10 @@ void SdlInputHandler::showProfileToast(const QString& profile)
     m_ProfileToastTimer = 0;
     const QByteArray text = QStringLiteral("QuickKey preset: %1").arg(profile).toUtf8();
     auto& overlay = Session::get()->getOverlayManager();
+    int viewportWidth = 0;
+    int viewportHeight = 0;
+    SDL_GetWindowSize(m_Window, &viewportWidth, &viewportHeight);
+    overlay.setQuickKeyViewportSize(viewportWidth, viewportHeight);
     overlay.updateOverlayText(Overlay::OverlayQuickKeyProfiles, text.constData());
     overlay.setOverlayState(Overlay::OverlayQuickKeyProfiles, true);
     m_ProfileToastShownAt = SDL_GetTicks();

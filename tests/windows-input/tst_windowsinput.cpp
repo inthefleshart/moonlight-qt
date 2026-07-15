@@ -7,6 +7,7 @@
 #include "streaming/input/pencursorvisibility.h"
 #include "streaming/input/pointerhistory.h"
 #include "streaming/input/tabletprofileselector.h"
+#include "streaming/video/quickkeyoverlaylayout.h"
 #include "settings/tabletmappingmanager.h"
 
 class WindowsInputTests : public QObject
@@ -21,6 +22,9 @@ private slots:
     void penCursorPoliciesPreserveNavigationCursor();
     void pointerHistoryPreservesTransitionsAndNewest();
     void profileSelectorPaginatesAndHitTests();
+    void quickKeyOverlayMatchesPhysicalButtonLayout();
+    void quickKeyOverlayNormalizesMalformedSlots();
+    void quickKeyOverlayStaysInsideViewport();
     void shippedProfilesExposeTenControls();
 };
 
@@ -161,6 +165,71 @@ void WindowsInputTests::profileSelectorPaginatesAndHitTests()
     QCOMPARE(selector.rowForPoint(0, 0, 1200, 800, overlayWidth, overlayHeight, lineHeight), -1);
     selector.close();
     QVERIFY(!selector.isOpen());
+}
+
+void WindowsInputTests::quickKeyOverlayMatchesPhysicalButtonLayout()
+{
+    const auto layout = Overlay::QuickKeyOverlayLayout::calculate(2560, 1440, 10);
+    QCOMPARE(layout.profileRows.size(), 10);
+    QVERIFY(layout.leftPanel.width() > 0);
+    QVERIFY(layout.presetPanel.width() > layout.leftPanel.width());
+    QCOMPARE(layout.leftPanel.width(), layout.rightPanel.width());
+
+    for (int slot = 0; slot < 5; ++slot) {
+        QCOMPARE(Overlay::QuickKeyOverlayLayout::panelForSlot(slot),
+                 Overlay::QuickKeyPanelSide::Left);
+        QVERIFY(layout.leftPanel.contains(layout.bindingRows[slot]));
+    }
+    for (int slot = 5; slot < 10; ++slot) {
+        QCOMPARE(Overlay::QuickKeyOverlayLayout::panelForSlot(slot),
+                 Overlay::QuickKeyPanelSide::Right);
+        QVERIFY(layout.rightPanel.contains(layout.bindingRows[slot]));
+    }
+    QCOMPARE(Overlay::QuickKeyOverlayLayout::panelForSlot(-1),
+             Overlay::QuickKeyPanelSide::Invalid);
+    QCOMPARE(Overlay::QuickKeyOverlayLayout::panelForSlot(10),
+             Overlay::QuickKeyPanelSide::Invalid);
+
+    QCOMPARE(Overlay::QuickKeyOverlayLayout::visualRowForSlot(0), 0);
+    QCOMPARE(Overlay::QuickKeyOverlayLayout::visualRowForSlot(1), 1);
+    QCOMPARE(Overlay::QuickKeyOverlayLayout::visualRowForSlot(2), 3);
+    QCOMPARE(Overlay::QuickKeyOverlayLayout::visualRowForSlot(6), 1);
+    QCOMPARE(Overlay::QuickKeyOverlayLayout::visualRowForSlot(7), 3);
+    QVERIFY(layout.leftModeSwitch.y() > layout.bindingRows[1].y());
+    QVERIFY(layout.leftModeSwitch.bottom() < layout.bindingRows[2].bottom());
+    QVERIFY(layout.rightModeSwitch.y() > layout.bindingRows[6].y());
+    QVERIFY(layout.rightModeSwitch.bottom() < layout.bindingRows[7].bottom());
+}
+
+void WindowsInputTests::quickKeyOverlayStaysInsideViewport()
+{
+    for (const QSize viewport : {QSize(2560, 1440), QSize(3840, 2160),
+                                 QSize(1280, 720), QSize(720, 1280),
+                                 QSize(640, 480), QSize(320, 240)}) {
+        const auto layout = Overlay::QuickKeyOverlayLayout::calculate(
+            viewport.width(), viewport.height(), 10);
+        QVERIFY(layout.panelWidth + layout.shadowSize <= viewport.width());
+        QVERIFY(layout.panelHeight + layout.shadowSize <= viewport.height());
+        QVERIFY(layout.leftPanel.right() < layout.panelWidth);
+        QVERIFY(layout.presetPanel.right() < layout.panelWidth);
+        QVERIFY(layout.rightPanel.right() < layout.panelWidth);
+        for (const QRect& rect : layout.profileRows)
+            QVERIFY(layout.presetPanel.contains(rect));
+        for (const QRect& rect : layout.bindingRows)
+            QVERIFY(rect.right() < layout.panelWidth && rect.bottom() < layout.panelHeight);
+    }
+}
+
+void WindowsInputTests::quickKeyOverlayNormalizesMalformedSlots()
+{
+    const QVector<int> shuffledSlots{7, -1, 2, 7, 10, 0, 9};
+    const auto indexes = Overlay::QuickKeyOverlayLayout::bindingIndexesBySlot(shuffledSlots);
+    QCOMPARE(indexes[0], 5);
+    QCOMPARE(indexes[2], 2);
+    QCOMPARE(indexes[7], 0);
+    QCOMPARE(indexes[9], 6);
+    QCOMPARE(indexes[1], -1);
+    QCOMPARE(indexes[8], -1);
 }
 
 void WindowsInputTests::shippedProfilesExposeTenControls()

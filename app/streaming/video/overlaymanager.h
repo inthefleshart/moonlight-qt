@@ -29,6 +29,7 @@ struct QuickKeyBindingRow
     QString actionName;
     QString actionDetails;
     bool modified = false;
+    int slot = -1;
 };
 
 struct QuickKeyOverlayContent
@@ -61,6 +62,7 @@ public:
     char* getOverlayText(OverlayType type);
     void updateOverlayText(OverlayType type, const char* text);
     void updateQuickKeyOverlay(const QuickKeyOverlayContent& content);
+    void setQuickKeyViewportSize(int width, int height);
     int getOverlayMaxTextLength();
     void setOverlayTextUpdated(OverlayType type);
     void setOverlayState(OverlayType type, bool enabled);
@@ -78,6 +80,8 @@ private:
     void notifyOverlayUpdated(OverlayType type);
     SDL_Surface* RenderTextOutlinedWrapped(TTF_Font* font, const char* text, SDL_Color textColor, SDL_Color outlineColor, int outlineWidth, int wrapWidth);
     SDL_Surface* RenderQuickKeyOverlay();
+    SDL_Surface* RenderQuickKeyOverlayThreePanel();
+    SDL_Surface* RenderQuickKeyToast();
 
     struct {
         bool enabled;
@@ -93,6 +97,7 @@ private:
     IOverlayRenderer* m_Renderer;
     QByteArray m_FontData;
     QByteArray m_UiFontData;
+    QByteArray m_UiSemiboldFontData;
     QuickKeyOverlayContent m_QuickKeyContent;
     QVector<SDL_Rect> m_QuickKeyProfileRects;
     bool m_HasQuickKeyContent = false;

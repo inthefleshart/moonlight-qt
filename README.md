@@ -268,7 +268,7 @@ Press **Ctrl+Alt+Shift+P** while connected to open a client-side preset selector
 
 The **In-stream favorites…** editor controls the ordered rotation used by the assignable **Next favorite QuickKey preset** and **Previous favorite QuickKey preset** actions. The selector always shows all profiles alphabetically. Existing QuickKey customizations are preserved, and no shipped slot is assigned to these actions automatically.
 
-The selector uses a scalable two-pane artist interface. The preset list shows the highlighted, active, and favorite states; the QuickKey Reference pane shows all ten physical sources and the highlighted profile's friendly action names, shortcuts, hold actions, and pen-drag gestures. A blue edge marks a customized binding. Merely highlighting a profile previews its mappings without activating it.
+The selector uses a scalable three-panel dark interface that mirrors the tablet hardware. F1–F5 and their mapped actions appear on the left, the alphabetized preset list appears in the middle, and F6–F10 appear on the right. Labeled hardware-only Mode Switch spacers sit between F2/F3 and F7/F8. Both mapping panels update as the highlight moves, showing friendly action names, shortcuts, holds, sequences, and pen-drag gestures without activating the previewed preset. Blue marks the current selection, green the active preset, gold a favorite, and violet plus a **CUSTOM** label a modified binding.
 
 ### Use native Windows pen input
 

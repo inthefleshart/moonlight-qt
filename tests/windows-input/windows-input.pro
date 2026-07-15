@@ -11,6 +11,7 @@ SOURCES += \
     ../../app/streaming/input/penconversion.cpp \
     ../../app/streaming/input/tabletprofileselector.cpp \
     ../../app/streaming/input/pointerhistory.cpp \
+    ../../app/streaming/video/quickkeyoverlaylayout.cpp \
     ../../app/settings/tabletmappingmanager.cpp
 
 HEADERS += \
@@ -19,4 +20,5 @@ HEADERS += \
     ../../app/streaming/input/pencursorvisibility.h \
     ../../app/streaming/input/tabletprofileselector.h \
     ../../app/streaming/input/pointerhistory.h \
+    ../../app/streaming/video/quickkeyoverlaylayout.h \
     ../../app/settings/tabletmappingmanager.h
