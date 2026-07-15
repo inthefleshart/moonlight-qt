@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <QVector>
 
 #include "SDL_compat.h"
 #include <SDL_ttf.h>
@@ -12,6 +13,34 @@ enum OverlayType {
     OverlayStatusUpdate,
     OverlayQuickKeyProfiles,
     OverlayMax
+};
+
+struct QuickKeyProfileRow
+{
+    QString name;
+    bool selected = false;
+    bool active = false;
+    bool favorite = false;
+};
+
+struct QuickKeyBindingRow
+{
+    QString source;
+    QString actionName;
+    QString actionDetails;
+    bool modified = false;
+};
+
+struct QuickKeyOverlayContent
+{
+    QString activeProfile;
+    QString selectedProfile;
+    QVector<QuickKeyProfileRow> profiles;
+    QVector<QuickKeyBindingRow> bindings;
+    int firstVisibleIndex = 0;
+    int totalProfiles = 0;
+    int viewportWidth = 0;
+    int viewportHeight = 0;
 };
 
 class IOverlayRenderer
@@ -31,6 +60,7 @@ public:
     bool isOverlayEnabled(OverlayType type);
     char* getOverlayText(OverlayType type);
     void updateOverlayText(OverlayType type, const char* text);
+    void updateQuickKeyOverlay(const QuickKeyOverlayContent& content);
     int getOverlayMaxTextLength();
     void setOverlayTextUpdated(OverlayType type);
     void setOverlayState(OverlayType type, bool enabled);
@@ -39,6 +69,7 @@ public:
     int getOverlayWidth(OverlayType type);
     int getOverlayHeight(OverlayType type);
     int getOverlayLineHeight(OverlayType type);
+    int getQuickKeyProfileRowAt(int x, int y) const;
     SDL_Surface* getUpdatedOverlaySurface(OverlayType type);
 
     void setOverlayRenderer(IOverlayRenderer* renderer);
@@ -46,6 +77,7 @@ public:
 private:
     void notifyOverlayUpdated(OverlayType type);
     SDL_Surface* RenderTextOutlinedWrapped(TTF_Font* font, const char* text, SDL_Color textColor, SDL_Color outlineColor, int outlineWidth, int wrapWidth);
+    SDL_Surface* RenderQuickKeyOverlay();
 
     struct {
         bool enabled;
@@ -60,6 +92,10 @@ private:
     } m_Overlays[OverlayMax];
     IOverlayRenderer* m_Renderer;
     QByteArray m_FontData;
+    QByteArray m_UiFontData;
+    QuickKeyOverlayContent m_QuickKeyContent;
+    QVector<SDL_Rect> m_QuickKeyProfileRects;
+    bool m_HasQuickKeyContent = false;
 };
 
 }

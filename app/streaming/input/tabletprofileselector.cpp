@@ -64,6 +64,13 @@ int TabletProfileSelector::visibleCount() const
         static_cast<int>(m_Profiles.size()) - m_FirstVisibleIndex));
 }
 
+QString TabletProfileSelector::profileAtVisibleRow(int row) const
+{
+    const int index = m_FirstVisibleIndex + row;
+    return row >= 0 && row < visibleCount() && index < m_Profiles.size() ?
+               m_Profiles[index] : QString();
+}
+
 QString TabletProfileSelector::selectedProfile() const
 {
     return m_SelectedIndex >= 0 && m_SelectedIndex < m_Profiles.size() ?

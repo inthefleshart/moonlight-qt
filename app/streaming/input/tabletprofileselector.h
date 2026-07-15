@@ -23,6 +23,10 @@ public:
     int selectedIndex() const { return m_SelectedIndex; }
     int firstVisibleIndex() const { return m_FirstVisibleIndex; }
     int visibleCount() const;
+    int totalCount() const { return m_Profiles.size(); }
+    QString profileAtVisibleRow(int row) const;
+    bool isFavorite(const QString& profile) const { return m_Favorites.contains(profile); }
+    bool isActive(const QString& profile) const { return profile == m_ActiveProfile; }
     QString selectedProfile() const;
     QString renderText() const;
 

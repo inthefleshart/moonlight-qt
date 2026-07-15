@@ -115,9 +115,38 @@ void SdlInputHandler::cycleFavoriteProfile(int direction)
 void SdlInputHandler::renderProfileSelector()
 {
     if (!m_ProfileSelector.isOpen()) return;
-    const QByteArray text = m_ProfileSelector.renderText().toUtf8();
+    auto* manager = TabletMappingManager::get();
+    Overlay::QuickKeyOverlayContent content;
+    content.activeProfile = manager->activeProfile();
+    content.selectedProfile = m_ProfileSelector.selectedProfile();
+    content.firstVisibleIndex = m_ProfileSelector.firstVisibleIndex();
+    content.totalProfiles = m_ProfileSelector.totalCount();
+    SDL_GetWindowSize(m_Window, &content.viewportWidth, &content.viewportHeight);
+
+    for (int row = 0; row < m_ProfileSelector.visibleCount(); ++row) {
+        const QString profile = m_ProfileSelector.profileAtVisibleRow(row);
+        content.profiles.append({profile,
+                                 profile == content.selectedProfile,
+                                 m_ProfileSelector.isActive(profile),
+                                 m_ProfileSelector.isFavorite(profile)});
+    }
+
+    const auto actions = manager->actionsForProfile(content.selectedProfile);
+    for (int slot = 0; slot < TabletMappingManager::SlotCount; ++slot) {
+        const TabletSourceShortcut source = manager->sourceForSlot(slot);
+        const TabletControlAction action = slot < actions.size() ? actions[slot] : TabletControlAction{};
+        const QString displayText = action.displayText();
+        QString details = displayText;
+        const QString namePrefix = action.name + QStringLiteral(" — ");
+        if (!action.name.isEmpty() && details.startsWith(namePrefix))
+            details.remove(0, namePrefix.size());
+        else if (details == action.name || action.kind == TabletActionKind::Disabled)
+            details.clear();
+        content.bindings.append({source.displayText(), action.name, details, action.modified});
+    }
+
     auto& overlay = Session::get()->getOverlayManager();
-    overlay.updateOverlayText(Overlay::OverlayQuickKeyProfiles, text.constData());
+    overlay.updateQuickKeyOverlay(content);
     overlay.setOverlayState(Overlay::OverlayQuickKeyProfiles, true);
 }
 
@@ -173,11 +202,11 @@ int SdlInputHandler::profileSelectorRowAt(int x, int y) const
     int width = 0, height = 0;
     SDL_GetWindowSize(m_Window, &width, &height);
     auto& overlay = Session::get()->getOverlayManager();
-    return m_ProfileSelector.rowForPoint(
-        x, y, width, height,
-        overlay.getOverlayWidth(Overlay::OverlayQuickKeyProfiles),
-        overlay.getOverlayHeight(Overlay::OverlayQuickKeyProfiles),
-        overlay.getOverlayLineHeight(Overlay::OverlayQuickKeyProfiles));
+    const int overlayWidth = overlay.getOverlayWidth(Overlay::OverlayQuickKeyProfiles);
+    const int overlayHeight = overlay.getOverlayHeight(Overlay::OverlayQuickKeyProfiles);
+    const int overlayLeft = (width - overlayWidth) / 2;
+    const int overlayTop = (height - overlayHeight) / 2;
+    return overlay.getQuickKeyProfileRowAt(x - overlayLeft, y - overlayTop);
 }
 
 bool SdlInputHandler::handleProfileSelectorKey(SDL_KeyboardEvent* event)

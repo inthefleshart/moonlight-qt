@@ -131,8 +131,12 @@ void WindowsInputTests::profileSelectorPaginatesAndHitTests()
     TabletProfileSelector selector;
     selector.open(profiles, "Profile 12", {"Profile 01", "Profile 12"});
     QVERIFY(selector.isOpen());
+    QCOMPARE(selector.totalCount(), 15);
     QCOMPARE(selector.selectedProfile(), QString("Profile 12"));
     QCOMPARE(selector.firstVisibleIndex(), 2);
+    QCOMPARE(selector.profileAtVisibleRow(9), QString("Profile 12"));
+    QVERIFY(selector.isFavorite("Profile 12"));
+    QVERIFY(selector.isActive("Profile 12"));
     QVERIFY(selector.renderText().contains("> * Profile 12"));
 
     selector.moveSelection(1);
@@ -258,6 +262,16 @@ void WindowsInputTests::shippedProfilesExposeTenControls()
     QCOMPARE(manager->actionForSlot(1).localAction, TabletLocalAction::NextFavoriteProfile);
     QVERIFY(manager->setActionOption(2, "previousProfile"));
     QCOMPARE(manager->actionForSlot(2).localAction, TabletLocalAction::PreviousFavoriteProfile);
+
+    manager->setActiveProfile("Krita");
+    QVERIFY(manager->setActionOption(0, "diagnostics"));
+    manager->setActiveProfile("Default");
+    const auto kritaReference = manager->actionsForProfile("Krita");
+    QCOMPARE(kritaReference.size(), TabletMappingManager::SlotCount);
+    QCOMPARE(kritaReference[0].localAction, TabletLocalAction::ToggleDiagnostics);
+    QVERIFY(kritaReference[0].modified);
+    QCOMPARE(manager->activeProfile(), QString("Default"));
+    QVERIFY(manager->actionsForProfile("Not a profile").isEmpty());
 }
 
 QTEST_GUILESS_MAIN(WindowsInputTests)

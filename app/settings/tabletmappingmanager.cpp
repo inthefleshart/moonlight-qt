@@ -575,6 +575,28 @@ TabletControlAction TabletMappingManager::actionForSlot(int slot) const
     return m_Actions[slot];
 }
 
+QVector<TabletControlAction> TabletMappingManager::actionsForProfile(const QString& profile) const
+{
+    if (!m_ProfileOrder.contains(profile)) return {};
+    QVector<TabletControlAction> loaded;
+    {
+        QReadLocker guard(&m_Lock);
+        loaded = m_ShippedProfiles.value(profile, QVector<TabletControlAction>(SlotCount));
+    }
+    QSettings settings;
+    const QString profileId = profileIdForName(profile);
+    for (int slot = 0; slot < SlotCount; ++slot) {
+        const QByteArray json = settings.value(
+            QString("tabletMappings/v3/profiles/%1/slot%2").arg(profileId).arg(slot + 1))
+                                    .toByteArray();
+        if (json.isEmpty()) continue;
+        bool ok = false;
+        const auto action = actionFromJson(json, &ok);
+        if (ok) loaded[slot] = action;
+    }
+    return loaded;
+}
+
 TabletSourceShortcut TabletMappingManager::sourceForSlot(int slot) const
 {
     if (slot < 0 || slot >= SlotCount) return {};

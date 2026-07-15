@@ -146,6 +146,7 @@ public:
     Q_INVOKABLE bool isValidBinding(const QString& sequence) const;
 
     TabletControlAction actionForSlot(int slot) const;
+    QVector<TabletControlAction> actionsForProfile(const QString& profile) const;
     TabletSourceShortcut sourceForSlot(int slot) const;
     int slotForSource(quint16 virtualKey, bool control, bool alt, bool shift, bool meta) const;
 
