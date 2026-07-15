@@ -1470,7 +1470,7 @@ Flickable {
                         ToolTip.delay: 1000
                         ToolTip.timeout: 10000
                         ToolTip.visible: hovered
-                        ToolTip.text: qsTr("Automatic hides only Moonlight's local system cursor while native pen input is active. The remote application's brush cursor is unaffected.")
+                        ToolTip.text: qsTr("Automatic shows Moonlight's local cursor while the pen is hovering for Windows navigation, then hides it during pen contact while drawing. Always visible keeps it shown during contact too. The remote application's brush cursor is unaffected.")
                     }
                 }
 

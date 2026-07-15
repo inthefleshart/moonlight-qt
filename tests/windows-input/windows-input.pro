@@ -15,5 +15,6 @@ SOURCES += \
 HEADERS += \
     ../../app/streaming/input/inputgeometry.h \
     ../../app/streaming/input/penconversion.h \
+    ../../app/streaming/input/pencursorvisibility.h \
     ../../app/streaming/input/pointerhistory.h \
     ../../app/settings/tabletmappingmanager.h

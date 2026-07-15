@@ -235,6 +235,7 @@ HEADERS += \
     streaming/input/input.h \
     streaming/input/inputgeometry.h \
     streaming/input/penconversion.h \
+    streaming/input/pencursorvisibility.h \
     streaming/input/pointerhistory.h \
     streaming/session.h \
     streaming/audio/renderers/renderer.h \

@@ -3,6 +3,7 @@
 
 #include "streaming/input/inputgeometry.h"
 #include "streaming/input/penconversion.h"
+#include "streaming/input/pencursorvisibility.h"
 #include "streaming/input/pointerhistory.h"
 #include "settings/tabletmappingmanager.h"
 
@@ -15,6 +16,7 @@ private slots:
     void letterboxRejectsAndClamps();
     void convertsApolloCompatibleTilt();
     void preservesUnknownTilt();
+    void penCursorPoliciesPreserveNavigationCursor();
     void pointerHistoryPreservesTransitionsAndNewest();
     void shippedProfilesExposeTenControls();
 };
@@ -69,6 +71,23 @@ void WindowsInputTests::preservesUnknownTilt()
     QVERIFY(!unknown.valid);
     QCOMPARE(unknown.rotation, static_cast<uint16_t>(0xFFFF));
     QCOMPARE(unknown.tilt, static_cast<uint8_t>(0xFF));
+}
+
+void WindowsInputTests::penCursorPoliciesPreserveNavigationCursor()
+{
+    using namespace PenCursorVisibility;
+
+    QVERIFY(!shouldHide(Automatic, false, false));
+    QVERIFY(!shouldHide(Automatic, true, false));
+    QVERIFY(shouldHide(Automatic, true, true));
+
+    QVERIFY(!shouldHide(AlwaysVisible, false, false));
+    QVERIFY(!shouldHide(AlwaysVisible, true, false));
+    QVERIFY(!shouldHide(AlwaysVisible, true, true));
+
+    QVERIFY(!shouldHide(HideInRange, false, false));
+    QVERIFY(shouldHide(HideInRange, true, false));
+    QVERIFY(shouldHide(HideInRange, true, true));
 }
 
 void WindowsInputTests::pointerHistoryPreservesTransitionsAndNewest()

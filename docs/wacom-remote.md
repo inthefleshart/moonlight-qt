@@ -7,7 +7,7 @@ This Windows-only Moonlight fork captures integrated pen-display input with `WM_
 Open **Settings > Input Settings**:
 
 - **Use native Windows pen input**: keep enabled for a Windows Pointer API pen display.
-- **Pen cursor visibility**: use **Automatic** initially. It hides only Moonlight's local system cursor while the pen is in range; the remote application's brush cursor remains visible.
+- **Pen cursor visibility**: use **Automatic** initially. It shows Moonlight's local cursor while the pen is hovering so normal Windows controls remain easy to navigate, then hides the local cursor during pen contact while drawing. The remote application's brush cursor remains visible. Choose **Always visible** if you also want the local cursor shown while the pen is touching the display.
 - **Pen and touch interaction**: begin with **Windows default**. Use pen-priority only if unwanted palm contacts reach the host.
 - **Local pen diagnostics (memory-only)**: optional troubleshooting only. Aggregate batch, retained-sample, truncation, and processing-time counters stay on the client and are never uploaded or sent to another service. Typed keys and machine identifiers are never recorded.
 

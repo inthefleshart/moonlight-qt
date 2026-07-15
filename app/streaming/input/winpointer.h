@@ -35,7 +35,7 @@ private:
     void handleMessage(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
     void handlePenInfo(const POINTER_PEN_INFO& penInfo, UINT message, const RECT& clientRect);
     uint8_t eventTypeFor(const POINTER_PEN_INFO& penInfo, UINT message) const;
-    void updateCursorVisibility(bool penInRange);
+    void updateCursorVisibility(bool penInRange, bool penInContact);
     static bool isPenPromotedMouseMessage();
 
     HWND m_Window;

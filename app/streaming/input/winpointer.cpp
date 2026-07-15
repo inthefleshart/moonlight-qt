@@ -4,6 +4,7 @@
 
 #include "inputgeometry.h"
 #include "penconversion.h"
+#include "pencursorvisibility.h"
 #include "pointerhistory.h"
 
 #include <Limelight.h>
@@ -234,7 +235,7 @@ void WinPointerBridge::handlePenInfo(const POINTER_PEN_INFO& penInfo, UINT messa
             m_PenInRange = false;
             m_PenInContact = false;
             m_LastButtons = 0;
-            updateCursorVisibility(false);
+            updateCursorVisibility(false, false);
         }
         return;
     }
@@ -272,7 +273,7 @@ void WinPointerBridge::handlePenInfo(const POINTER_PEN_INFO& penInfo, UINT messa
     m_LastButtons = buttons;
     m_PenInRange = eventType != LI_TOUCH_EVENT_HOVER_LEAVE;
     m_PenInContact = isContact && eventType != LI_TOUCH_EVENT_UP;
-    updateCursorVisibility(m_PenInRange);
+    updateCursorVisibility(m_PenInRange, m_PenInContact);
 }
 
 void WinPointerBridge::cancelActivePen()
@@ -292,7 +293,7 @@ void WinPointerBridge::cancelActivePen()
     m_PenInRange = false;
     m_PenInContact = false;
     m_LastButtons = 0;
-    updateCursorVisibility(false);
+    updateCursorVisibility(false, false);
 }
 
 void WinPointerBridge::notifyRealMouseMotion()
@@ -321,9 +322,14 @@ bool WinPointerBridge::consumePromotedMouseButton()
     return true;
 }
 
-void WinPointerBridge::updateCursorVisibility(bool penInRange)
+void WinPointerBridge::updateCursorVisibility(bool penInRange, bool penInContact)
 {
-    const bool shouldHide = penInRange && m_CursorPolicy != 1;
+    // Automatic keeps a useful local pointer during hover for navigating normal
+    // Windows UI, then gets it out of the way while a pen-aware application is
+    // drawing its own cursor during contact. The explicit hide-in-range policy
+    // retains the old behaviour for users who never want the local cursor shown.
+    const bool shouldHide = PenCursorVisibility::shouldHide(
+        m_CursorPolicy, penInRange, penInContact);
     if (shouldHide == m_CursorHiddenForPen) {
         return;
     }

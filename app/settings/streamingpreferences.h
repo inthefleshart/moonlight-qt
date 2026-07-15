@@ -4,6 +4,8 @@
 #include <QRect>
 #include <QQmlEngine>
 
+#include "streaming/input/pencursorvisibility.h"
+
 class StreamingPreferences : public QObject
 {
     Q_OBJECT
@@ -118,9 +120,9 @@ public:
 
     enum PenCursorPolicy
     {
-        PEN_CURSOR_AUTOMATIC,
-        PEN_CURSOR_ALWAYS_VISIBLE,
-        PEN_CURSOR_HIDE_IN_RANGE,
+        PEN_CURSOR_AUTOMATIC = PenCursorVisibility::Automatic,
+        PEN_CURSOR_ALWAYS_VISIBLE = PenCursorVisibility::AlwaysVisible,
+        PEN_CURSOR_HIDE_IN_RANGE = PenCursorVisibility::HideInRange,
     };
     Q_ENUM(PenCursorPolicy);
 
