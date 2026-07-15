@@ -189,6 +189,8 @@ SOURCES += \
     streaming/input/abstouch.cpp \
     streaming/input/inputgeometry.cpp \
     streaming/input/penconversion.cpp \
+    streaming/input/tabletprofileselector.cpp \
+    streaming/input/profileoverlayinput.cpp \
     streaming/input/pointerhistory.cpp \
     streaming/input/gamepad.cpp \
     streaming/input/input.cpp \
@@ -236,6 +238,7 @@ HEADERS += \
     streaming/input/inputgeometry.h \
     streaming/input/penconversion.h \
     streaming/input/pencursorvisibility.h \
+    streaming/input/tabletprofileselector.h \
     streaming/input/pointerhistory.h \
     streaming/session.h \
     streaming/audio/renderers/renderer.h \

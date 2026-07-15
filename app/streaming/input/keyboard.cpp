@@ -10,8 +10,7 @@
 #define VK_0 0x30
 #define VK_A 0x41
 
-namespace {
-quint16 virtualKeyForScancode(SDL_Scancode scancode)
+quint16 SdlInputHandler::virtualKeyForScancode(SDL_Scancode scancode)
 {
     if (scancode >= SDL_SCANCODE_1 && scancode <= SDL_SCANCODE_9)
         return static_cast<quint16>((scancode - SDL_SCANCODE_1) + 0x31);
@@ -61,6 +60,7 @@ quint16 virtualKeyForScancode(SDL_Scancode scancode)
     }
 }
 
+namespace {
 char modifierMask(const TabletKeyStroke& stroke)
 {
     return (stroke.control ? MODIFIER_CTRL : 0) | (stroke.alt ? MODIFIER_ALT : 0) |
@@ -152,6 +152,15 @@ void SdlInputHandler::executeTabletAction(int slot, const TabletControlAction& a
         case TabletLocalAction::ResetStuckInput:
             releaseTabletActions();
             raiseAllKeys();
+            break;
+        case TabletLocalAction::OpenProfileSelector:
+            toggleProfileSelector();
+            break;
+        case TabletLocalAction::NextFavoriteProfile:
+            cycleFavoriteProfile(1);
+            break;
+        case TabletLocalAction::PreviousFavoriteProfile:
+            cycleFavoriteProfile(-1);
             break;
         default: break;
         }
@@ -325,12 +334,15 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
     case KeyComboToggleKeyboardGrab:
         m_CaptureSystemKeysMode = isSystemKeyCaptureActive() ? StreamingPreferences::CSK_OFF : StreamingPreferences::CSK_ALWAYS;
         updateKeyboardGrabState(); break;
+    case KeyComboToggleProfileSelector:
+        toggleProfileSelector(); break;
     default: Q_UNREACHABLE();
     }
 }
 
 void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
 {
+    if (handleProfileSelectorKey(event)) return;
     short keyCode;
     char modifiers;
     bool shouldNotConvertToScanCodeOnServer = false;

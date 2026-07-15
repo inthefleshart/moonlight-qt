@@ -57,7 +57,8 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
         m_NativePenBridge = std::make_unique<WinPointerBridge>(streamWidth, streamHeight,
                                                                prefs.inputDiagnostics,
                                                                static_cast<int>(prefs.penCursorPolicy),
-                                                               this, nativePenGestureCallback);
+                                                               this, nativePenGestureCallback,
+                                                               nativeLocalPointerCallback);
     }
 #endif
     // System keys are always captured when running without a DE
@@ -147,6 +148,11 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
     m_SpecialKeyCombos[KeyComboToggleKeyboardGrab].scanCode = SDL_SCANCODE_K;
     m_SpecialKeyCombos[KeyComboToggleKeyboardGrab].enabled = WMUtils::isRunningDesktopEnvironment();
 
+    m_SpecialKeyCombos[KeyComboToggleProfileSelector].keyCombo = KeyComboToggleProfileSelector;
+    m_SpecialKeyCombos[KeyComboToggleProfileSelector].keyCode = SDLK_p;
+    m_SpecialKeyCombos[KeyComboToggleProfileSelector].scanCode = SDL_SCANCODE_P;
+    m_SpecialKeyCombos[KeyComboToggleProfileSelector].enabled = true;
+
     m_OldIgnoreDevices = SDL_GetHint(SDL_HINT_GAMECONTROLLER_IGNORE_DEVICES);
     m_OldIgnoreDevicesExcept = SDL_GetHint(SDL_HINT_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT);
 
@@ -230,6 +236,8 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
 
 SdlInputHandler::~SdlInputHandler()
 {
+    closeProfileSelector();
+    SDL_RemoveTimer(m_ProfileToastTimer);
     releaseTabletActions();
     for (int i = 0; i < MAX_GAMEPADS; i++) {
         if (m_GamepadState[i].mouseEmulationTimer != 0) {
@@ -343,6 +351,7 @@ void SdlInputHandler::notifyMouseLeave()
 
 void SdlInputHandler::notifyFocusLost()
 {
+    closeProfileSelector();
     releaseTabletActions();
 #ifdef Q_OS_WIN32
     if (m_NativePenBridge) {
@@ -483,6 +492,7 @@ void SdlInputHandler::setCaptureActive(bool active)
 
 void SdlInputHandler::handleTouchFingerEvent(SDL_TouchFingerEvent* event)
 {
+    if (handleProfileSelectorTouch(event)) return;
     if (!m_TouchForwardingEnabled) {
         return;
     }

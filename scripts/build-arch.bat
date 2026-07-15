@@ -120,6 +120,7 @@ if defined CI_VERSION (
 ) else (
     set /p VERSION=<%SOURCE_ROOT%\app\version.txt
 )
+set /p ARTIST_VERSION=<%SOURCE_ROOT%\app\artist-version.txt
 
 rem Use the correct VC tools for the specified architecture
 if /I "%ARCH%" EQU "x64" (
@@ -303,7 +304,7 @@ if defined CI_VERSION (
     if !ERRORLEVEL! NEQ 0 goto Error
 )
 
-7z a %INSTALLER_FOLDER%\MoonlightArtistPortable-%ARCH%-%VERSION%.zip %DEPLOY_FOLDER%\*
+7z a %INSTALLER_FOLDER%\MoonlightArtistPortable-%ARCH%-%VERSION%-%ARTIST_VERSION%.zip %DEPLOY_FOLDER%\*
 if !ERRORLEVEL! NEQ 0 goto Error
 
 echo Build successful for Moonlight v%VERSION% %ARCH% binaries!

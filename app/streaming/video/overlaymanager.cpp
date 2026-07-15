@@ -15,6 +15,9 @@ OverlayManager::OverlayManager() :
     m_Overlays[OverlayType::OverlayStatusUpdate].color = {0xCC, 0x00, 0x00, 0xFF};
     m_Overlays[OverlayType::OverlayStatusUpdate].fontSize = 36;
 
+    m_Overlays[OverlayType::OverlayQuickKeyProfiles].color = {0xF4, 0xF4, 0xF4, 0xFF};
+    m_Overlays[OverlayType::OverlayQuickKeyProfiles].fontSize = 28;
+
     // While TTF will usually not be initialized here, it is valid for that not to
     // be the case, since Session destruction is deferred and could overlap with
     // the lifetime of a new Session object.
@@ -74,6 +77,22 @@ int OverlayManager::getOverlayFontSize(OverlayType type)
     return m_Overlays[type].fontSize;
 }
 
+int OverlayManager::getOverlayWidth(OverlayType type)
+{
+    return m_Overlays[type].width;
+}
+
+int OverlayManager::getOverlayHeight(OverlayType type)
+{
+    return m_Overlays[type].height;
+}
+
+int OverlayManager::getOverlayLineHeight(OverlayType type)
+{
+    return m_Overlays[type].font ? TTF_FontLineSkip(m_Overlays[type].font) :
+                                  m_Overlays[type].fontSize + 4;
+}
+
 SDL_Surface* OverlayManager::getUpdatedOverlaySurface(OverlayType type)
 {
     // If a new surface is available, return it. If not, return nullptr.
@@ -100,6 +119,8 @@ void OverlayManager::setOverlayState(OverlayType type, bool enabled)
         if (!enabled) {
             // Set the text to empty string on disable
             m_Overlays[type].text[0] = 0;
+            m_Overlays[type].width = 0;
+            m_Overlays[type].height = 0;
         }
 
         notifyOverlayUpdated(type);
@@ -145,9 +166,7 @@ void OverlayManager::notifyOverlayUpdated(OverlayType type)
     }
 
     // Exchange the old surface with the new one
-    SDL_Surface* oldSurface = (SDL_Surface*)SDL_AtomicSetPtr(
-        (void**)&m_Overlays[type].surface,
-        m_Overlays[type].enabled ?
+    SDL_Surface* newSurface = m_Overlays[type].enabled ?
             // The _Wrapped variant is required for line breaks to work
             RenderTextOutlinedWrapped(m_Overlays[type].font,
                                       m_Overlays[type].text,
@@ -155,7 +174,11 @@ void OverlayManager::notifyOverlayUpdated(OverlayType type)
                                       {0, 0, 0, 255},
                                       4,
                                       1024)
-            : nullptr);
+            : nullptr;
+    m_Overlays[type].width = newSurface ? newSurface->w : 0;
+    m_Overlays[type].height = newSurface ? newSurface->h : 0;
+    SDL_Surface* oldSurface = (SDL_Surface*)SDL_AtomicSetPtr(
+        (void**)&m_Overlays[type].surface, newSurface);
 
     // Notify the renderer
     m_Renderer->notifyOverlayUpdated(type);

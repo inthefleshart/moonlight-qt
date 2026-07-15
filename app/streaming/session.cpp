@@ -2019,6 +2019,11 @@ void Session::exec()
                 m_InputHandler->setAdaptiveTriggers((uint16_t)(uintptr_t)event.user.data1,
                                                     (DualSenseOutputReport *)event.user.data2);
                 break;
+            case SdlInputHandler::SdlCodeHideProfileToast:
+                if (event.user.data1 == m_InputHandler)
+                    m_InputHandler->hideProfileToast(static_cast<Uint32>(
+                        reinterpret_cast<uintptr_t>(event.user.data2)));
+                break;
             default:
                 SDL_assert(false);
             }
@@ -2041,6 +2046,10 @@ void Session::exec()
                 break;
             case SDL_WINDOWEVENT_LEAVE:
                 m_InputHandler->notifyMouseLeave();
+                break;
+            case SDL_WINDOWEVENT_SIZE_CHANGED:
+            case SDL_WINDOWEVENT_RESIZED:
+                m_InputHandler->refreshProfileSelectorOverlay();
                 break;
             }
 

@@ -213,6 +213,9 @@ void EGLRenderer::renderOverlay(Overlay::OverlayType type, int viewportWidth, in
             // Top left
             overlayRect.x = 0;
             overlayRect.y = viewportHeight - newSurface->h;
+        } else if (type == Overlay::OverlayQuickKeyProfiles) {
+            overlayRect.x = (viewportWidth - newSurface->w) / 2;
+            overlayRect.y = (viewportHeight - newSurface->h) / 2;
         } else {
             SDL_assert(false);
         }

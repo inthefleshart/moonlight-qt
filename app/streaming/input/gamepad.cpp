@@ -190,6 +190,7 @@ Uint32 SdlInputHandler::mouseEmulationTimerCallback(Uint32 interval, void *param
 
 void SdlInputHandler::handleControllerAxisEvent(SDL_ControllerAxisEvent* event)
 {
+    if (m_ProfileSelector.isOpen()) return;
     SDL_JoystickID gameControllerId = event->which;
     GamepadState* state = findStateForGamepad(gameControllerId);
     if (state == NULL) {
@@ -254,6 +255,7 @@ void SdlInputHandler::handleControllerAxisEvent(SDL_ControllerAxisEvent* event)
 
 void SdlInputHandler::handleControllerButtonEvent(SDL_ControllerButtonEvent* event)
 {
+    if (handleProfileSelectorControllerButton(event)) return;
     if (event->button >= SDL_arraysize(k_ButtonMap)) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                     "No mapping for gamepad button: %u",

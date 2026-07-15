@@ -1567,6 +1567,13 @@ Flickable {
                         font.bold: true
                         elide: Text.ElideRight
                     }
+                    Button {
+                        text: qsTr("In-stream favorites…")
+                        onClicked: favoriteProfilesDialog.open()
+                        ToolTip.delay: 750
+                        ToolTip.visible: hovered
+                        ToolTip.text: qsTr("Choose and order the presets used by the in-stream Next and Previous preset actions.")
+                    }
                 }
 
                 Popup {
@@ -1593,6 +1600,77 @@ Flickable {
                             }
                         }
                         ScrollIndicator.vertical: ScrollIndicator { }
+                    }
+                }
+
+                Dialog {
+                    id: favoriteProfilesDialog
+                    modal: true
+                    width: Math.min(720, settingsPage.width - 40)
+                    height: Math.min(760, settingsPage.height - 40)
+                    anchors.centerIn: Overlay.overlay
+                    title: qsTr("In-stream preset favorites")
+                    standardButtons: Dialog.Close
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        spacing: 10
+
+                        Label {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            text: qsTr("Ctrl+Alt+Shift+P opens every preset while streaming. Next/Previous preset actions cycle only through the checked favorites, in the order shown. At least one favorite must remain.")
+                        }
+
+                        ListView {
+                            id: favoriteProfilesList
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            clip: true
+                            spacing: 4
+                            model: TabletMappingManager.favoriteProfileOptions
+                            delegate: Rectangle {
+                                required property var modelData
+                                width: favoriteProfilesList.width
+                                height: 44
+                                color: modelData.favorite ? Qt.rgba(0.2, 0.45, 0.75, 0.18) : "transparent"
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 8
+                                    anchors.rightMargin: 8
+                                    CheckBox {
+                                        checked: modelData.favorite
+                                        onToggled: {
+                                            if (!TabletMappingManager.setProfileFavorite(modelData.name, checked))
+                                                checked = true
+                                        }
+                                    }
+                                    Label {
+                                        Layout.fillWidth: true
+                                        text: modelData.favorite ? qsTr("%1. %2").arg(modelData.order + 1).arg(modelData.name) : modelData.name
+                                        elide: Text.ElideRight
+                                    }
+                                    Button {
+                                        text: "▲"
+                                        enabled: modelData.favorite && modelData.order > 0
+                                        onClicked: TabletMappingManager.moveFavoriteProfile(modelData.name, -1)
+                                    }
+                                    Button {
+                                        text: "▼"
+                                        enabled: modelData.favorite && modelData.order >= 0 &&
+                                                 modelData.order < TabletMappingManager.favoriteProfileCount - 1
+                                        onClicked: TabletMappingManager.moveFavoriteProfile(modelData.name, 1)
+                                    }
+                                }
+                            }
+                            ScrollIndicator.vertical: ScrollIndicator { }
+                        }
+
+                        Button {
+                            text: qsTr("Reset to all presets alphabetically")
+                            onClicked: TabletMappingManager.resetFavoriteProfiles()
+                        }
                     }
                 }
 

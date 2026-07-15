@@ -668,6 +668,10 @@ void DXVA2Renderer::notifyOverlayUpdated(Overlay::OverlayType type)
         renderRect.x = 0;
         renderRect.y = 0;
     }
+    else if (type == Overlay::OverlayQuickKeyProfiles) {
+        renderRect.x = (m_DisplayWidth - newSurface->w) / 2;
+        renderRect.y = (m_DisplayHeight - newSurface->h) / 2;
+    }
 
     renderRect.w = newSurface->w;
     renderRect.h = newSurface->h;

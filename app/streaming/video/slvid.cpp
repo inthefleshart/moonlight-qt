@@ -174,7 +174,7 @@ void SLVideoDecoder::notifyOverlayUpdated(Overlay::OverlayType type)
     // SLVideo supports only one visible overlay at a time. Since we don't have
     // stats like the FFmpeg-based decoders, we'll just support the status update
     // overlay and nothing else.
-    if (type != Overlay::OverlayStatusUpdate) {
+    if (type != Overlay::OverlayStatusUpdate && type != Overlay::OverlayQuickKeyProfiles) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                      "Unsupported overlay type: %d", type);
         return;
@@ -215,10 +215,15 @@ void SLVideoDecoder::notifyOverlayUpdated(Overlay::OverlayType type)
     SDL_ConvertPixels(newSurface->w, newSurface->h, newSurface->format->format, newSurface->pixels, newSurface->pitch,
                       SDL_PIXELFORMAT_ARGB8888, pixels, pitch);
 
-    // Position the status overlay at the bottom left corner
+    // Position status at the bottom left and the QuickKey selector in the center.
     float flWidth = (float)newSurface->w / m_ViewportWidth;
     float flHeight = (float)newSurface->h / m_ViewportHeight;
-    SLVideo_SetOverlayDisplayArea(m_Overlay, 0.0f, 1.0f - flHeight, flWidth, flHeight);
+    if (type == Overlay::OverlayQuickKeyProfiles) {
+        SLVideo_SetOverlayDisplayArea(m_Overlay, (1.0f - flWidth) / 2.0f,
+                                     (1.0f - flHeight) / 2.0f, flWidth, flHeight);
+    } else {
+        SLVideo_SetOverlayDisplayArea(m_Overlay, 0.0f, 1.0f - flHeight, flWidth, flHeight);
+    }
 
     // We're done with the surface now
     SDL_FreeSurface(newSurface);

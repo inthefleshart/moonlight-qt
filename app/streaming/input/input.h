@@ -2,6 +2,7 @@
 
 #include "settings/streamingpreferences.h"
 #include "settings/tabletmappingmanager.h"
+#include "streaming/input/tabletprofileselector.h"
 #include "backend/computermanager.h"
 
 #include "SDL_compat.h"
@@ -91,6 +92,8 @@ struct DualSenseOutputReport{
 class SdlInputHandler
 {
 public:
+    static constexpr int SdlCodeHideProfileToast = 106;
+
     explicit SdlInputHandler(StreamingPreferences& prefs, int streamWidth, int streamHeight);
 
     ~SdlInputHandler();
@@ -164,6 +167,9 @@ public:
 
     bool isNativePenInputEnabled() const;
 
+    void hideProfileToast(Uint32 timerToken);
+    void refreshProfileSelectorOverlay();
+
 private:
     enum KeyCombo {
         KeyComboQuit,
@@ -177,6 +183,7 @@ private:
         KeyComboTogglePointerRegionLock,
         KeyComboQuitAndExit,
         KeyComboToggleKeyboardGrab,
+        KeyComboToggleProfileSelector,
         KeyComboMax
     };
 
@@ -198,14 +205,34 @@ private:
     void performSpecialKeyCombo(KeyCombo combo);
 
     bool handleTabletMappedKey(SDL_KeyboardEvent* event);
+    static quint16 virtualKeyForScancode(SDL_Scancode scancode);
     void executeTabletAction(int slot, const TabletControlAction& action, bool pressed);
     void sendTabletKeyStroke(const TabletKeyStroke& stroke, bool pressed);
     void releaseTabletActions();
     void releasePenGesture();
+    void releaseRemoteInputForProfileChange();
+    void toggleProfileSelector();
+    void openProfileSelector();
+    void closeProfileSelector();
+    void applySelectedProfile();
+    void cycleFavoriteProfile(int direction);
+    void renderProfileSelector();
+    void showProfileToast(const QString& profile);
+    bool handleProfileSelectorKey(SDL_KeyboardEvent* event);
+    bool handleProfileSelectorMouseButton(SDL_MouseButtonEvent* event);
+    bool handleProfileSelectorMouseMotion(SDL_MouseMotionEvent* event);
+    bool handleProfileSelectorMouseWheel(SDL_MouseWheelEvent* event);
+    bool handleProfileSelectorTouch(SDL_TouchFingerEvent* event);
+    bool handleProfileSelectorControllerButton(SDL_ControllerButtonEvent* event);
+    void updateProfileSelectorPointerReady();
+    int profileSelectorRowAt(int x, int y) const;
 #ifdef Q_OS_WIN32
     static bool nativePenGestureCallback(void* context, uint8_t eventType, float x, float y,
                                          bool inContact);
     bool handleNativePenGesture(uint8_t eventType, float x, float y, bool inContact);
+    static bool nativeLocalPointerCallback(void* context, uint8_t eventType, float x, float y,
+                                           bool inContact);
+    bool handleNativeLocalPointer(uint8_t eventType, float x, float y, bool inContact);
 #endif
 
     static
@@ -222,6 +249,8 @@ private:
 
     static
     Uint32 dragTimerCallback(Uint32 interval, void* param);
+
+    static Uint32 profileToastTimerCallback(Uint32 interval, void* param);
 
     SDL_Window* m_Window;
     bool m_MultiController;
@@ -245,6 +274,14 @@ private:
     bool m_PenGestureKeysDown;
     bool m_TouchForwardingEnabled;
     bool m_RuntimeDiagnosticsEnabled;
+    TabletProfileSelector m_ProfileSelector;
+    bool m_ProfileSelectorPointerReady = true;
+    bool m_ProfileSelectorPointerPressed = false;
+    int m_ProfileSelectorPressedRow = -1;
+    QSet<quint16> m_SuppressedTabletSourceKeyUps;
+    QSet<SDL_Scancode> m_SuppressedKeyUps;
+    SDL_TimerID m_ProfileToastTimer = 0;
+    Uint32 m_ProfileToastShownAt = 0;
     bool m_FakeMouseCaptureActive;
     bool m_KeyboardCaptureActive;
     QString m_OldIgnoreDevices;

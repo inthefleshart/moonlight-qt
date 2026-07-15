@@ -1,10 +1,12 @@
 #include <QtTest>
+#include <QJsonDocument>
 #include <QSettings>
 
 #include "streaming/input/inputgeometry.h"
 #include "streaming/input/penconversion.h"
 #include "streaming/input/pencursorvisibility.h"
 #include "streaming/input/pointerhistory.h"
+#include "streaming/input/tabletprofileselector.h"
 #include "settings/tabletmappingmanager.h"
 
 class WindowsInputTests : public QObject
@@ -18,6 +20,7 @@ private slots:
     void preservesUnknownTilt();
     void penCursorPoliciesPreserveNavigationCursor();
     void pointerHistoryPreservesTransitionsAndNewest();
+    void profileSelectorPaginatesAndHitTests();
     void shippedProfilesExposeTenControls();
 };
 
@@ -121,13 +124,58 @@ void WindowsInputTests::pointerHistoryPreservesTransitionsAndNewest()
     QVERIFY(keptTransition96);
 }
 
+void WindowsInputTests::profileSelectorPaginatesAndHitTests()
+{
+    QStringList profiles;
+    for (int i = 1; i <= 15; ++i) profiles << QString("Profile %1").arg(i, 2, 10, QChar('0'));
+    TabletProfileSelector selector;
+    selector.open(profiles, "Profile 12", {"Profile 01", "Profile 12"});
+    QVERIFY(selector.isOpen());
+    QCOMPARE(selector.selectedProfile(), QString("Profile 12"));
+    QCOMPARE(selector.firstVisibleIndex(), 2);
+    QVERIFY(selector.renderText().contains("> * Profile 12"));
+
+    selector.moveSelection(1);
+    QCOMPARE(selector.selectedProfile(), QString("Profile 13"));
+    selector.pageSelection(-1);
+    QCOMPARE(selector.selectedProfile(), QString("Profile 03"));
+    selector.selectLast();
+    QCOMPARE(selector.selectedProfile(), QString("Profile 15"));
+    selector.moveSelection(1);
+    QCOMPARE(selector.selectedProfile(), QString("Profile 01"));
+
+    selector.selectFirst();
+    const int overlayWidth = 600;
+    const int lineHeight = 30;
+    const int overlayHeight = (TabletProfileSelector::HeaderLines +
+                               TabletProfileSelector::PageSize + 2) * lineHeight;
+    const int left = (1200 - overlayWidth) / 2;
+    const int top = (800 - overlayHeight) / 2;
+    QCOMPARE(selector.rowForPoint(left + 20,
+                                  top + TabletProfileSelector::HeaderLines * lineHeight + 5,
+                                  1200, 800, overlayWidth, overlayHeight, lineHeight), 0);
+    QCOMPARE(selector.rowForPoint(0, 0, 1200, 800, overlayWidth, overlayHeight, lineHeight), -1);
+    selector.close();
+    QVERIFY(!selector.isOpen());
+}
+
 void WindowsInputTests::shippedProfilesExposeTenControls()
 {
     QCoreApplication::setOrganizationName("MoonlightInputTests");
     QCoreApplication::setApplicationName("MoonlightInputTests");
-    QSettings().clear();
+    QSettings settings;
+    settings.clear();
+    const QByteArray oldV2Action = R"({"schema":2,"kind":2,"activation":0,"name":"Migrated Undo","chord":{"key":90,"control":true,"alt":false,"shift":false,"meta":false},"sequence":[],"mouseButton":0,"wheelDelta":0,"localAction":0})";
+    settings.setValue("tabletMappings/v2/activeProfile", "Krita");
+    settings.setValue("tabletMappings/v2/profiles/krita/slot1", oldV2Action);
 
     auto* manager = TabletMappingManager::get();
+    QCOMPARE(manager->activeProfile(), QString("Krita"));
+    QCOMPARE(settings.value("tabletMappings/v2/profiles/krita/slot1").toByteArray(), oldV2Action);
+    const auto migratedJson = QJsonDocument::fromJson(
+        settings.value("tabletMappings/v3/profiles/krita/slot1").toByteArray()).object();
+    QCOMPARE(migratedJson.value("schema").toInt(), 3);
+    QCOMPARE(migratedJson.value("name").toString(), QString("Migrated Undo"));
     QCOMPARE(manager->rowCount(), TabletMappingManager::SlotCount);
     const QStringList requiredProfiles = {
         "Krita", "Photoshop", "Substance 3D Painter", "ZBrush — Right-Click Navigation",
@@ -143,6 +191,7 @@ void WindowsInputTests::shippedProfilesExposeTenControls()
     QStringList sortedProfiles = manager->profiles();
     sortedProfiles.sort(Qt::CaseInsensitive);
     QCOMPARE(manager->profiles(), sortedProfiles);
+    QCOMPARE(manager->favoriteProfileCount(), manager->profiles().size());
 
     for (const auto& profile : manager->profiles()) {
         manager->setActiveProfile(profile);
@@ -178,9 +227,37 @@ void WindowsInputTests::shippedProfilesExposeTenControls()
     QSignalSpy resetSpy(manager, &QAbstractItemModel::modelReset);
     manager->setActiveProfile("Krita");
     QCOMPARE(resetSpy.count(), 1);
+    manager->resetBinding(0);
     QCOMPARE(manager->data(manager->index(0), TabletMappingManager::ActionNameRole).toString(),
              QString("Undo"));
     QVERIFY(manager->data(manager->index(0), TabletMappingManager::ActionTextRole).toString().contains("Ctrl+Z"));
+
+    for (const QString& profile : manager->profiles()) {
+        if (profile != "Default" && profile != "Krita")
+            QVERIFY(manager->setProfileFavorite(profile, false));
+    }
+    QCOMPARE(manager->favoriteProfileCount(), 2);
+    manager->setActiveProfile("Photoshop");
+    QCOMPARE(manager->cycleFavoriteProfile(1), QString("Default"));
+    QCOMPARE(manager->cycleFavoriteProfile(1), QString("Krita"));
+    QCOMPARE(manager->cycleFavoriteProfile(1), QString("Default"));
+    manager->setActiveProfile("Photoshop");
+    QCOMPARE(manager->cycleFavoriteProfile(-1), QString("Krita"));
+    QVERIFY(manager->moveFavoriteProfile("Krita", -1));
+    manager->setActiveProfile("Photoshop");
+    QCOMPARE(manager->cycleFavoriteProfile(1), QString("Krita"));
+    QVERIFY(manager->setProfileFavorite("Default", false));
+    QVERIFY(!manager->setProfileFavorite("Krita", false));
+    manager->resetFavoriteProfiles();
+    QCOMPARE(manager->favoriteProfileCount(), manager->profiles().size());
+
+    manager->setActiveProfile("Default");
+    QVERIFY(manager->setActionOption(0, "profileSelector"));
+    QCOMPARE(manager->actionForSlot(0).localAction, TabletLocalAction::OpenProfileSelector);
+    QVERIFY(manager->setActionOption(1, "nextProfile"));
+    QCOMPARE(manager->actionForSlot(1).localAction, TabletLocalAction::NextFavoriteProfile);
+    QVERIFY(manager->setActionOption(2, "previousProfile"));
+    QCOMPARE(manager->actionForSlot(2).localAction, TabletLocalAction::PreviousFavoriteProfile);
 }
 
 QTEST_GUILESS_MAIN(WindowsInputTests)

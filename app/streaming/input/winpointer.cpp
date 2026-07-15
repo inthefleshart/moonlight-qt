@@ -26,13 +26,15 @@ constexpr ULONG_PTR kTouchMessageFlag = 0x80;
 
 WinPointerBridge::WinPointerBridge(int streamWidth, int streamHeight, bool diagnosticsEnabled,
                                    int cursorPolicy, void* gestureContext,
-                                   GestureCallback gestureCallback)
+                                   GestureCallback gestureCallback,
+                                   LocalPointerCallback localPointerCallback)
     : m_Window(nullptr),
       m_StreamWidth(streamWidth),
       m_StreamHeight(streamHeight),
       m_DiagnosticsEnabled(diagnosticsEnabled),
       m_CursorPolicy(cursorPolicy),
       m_CursorHiddenForPen(false),
+      m_LocalOverlayActive(false),
       m_PenInRange(false),
       m_PenInContact(false),
       m_LastButtons(0),
@@ -46,7 +48,8 @@ WinPointerBridge::WinPointerBridge(int streamWidth, int streamHeight, bool diagn
       m_PromotedMouseMotionCount(0),
       m_PromotedMouseButtonCount(0),
       m_GestureContext(gestureContext),
-      m_GestureCallback(gestureCallback)
+      m_GestureCallback(gestureCallback),
+      m_LocalPointerCallback(localPointerCallback)
 {
     SDL_SetWindowsMessageHook(messageHook, this);
 }
@@ -87,7 +90,8 @@ void WinPointerBridge::messageHook(void* userdata, void* hwnd, unsigned int mess
 
 void WinPointerBridge::handleMessage(HWND hwnd, UINT message, WPARAM wParam, LPARAM)
 {
-    if (!m_Window || hwnd != m_Window || !(LiGetHostFeatureFlags() & LI_FF_PEN_TOUCH_EVENTS)) {
+    if (!m_Window || hwnd != m_Window ||
+            (!(LiGetHostFeatureFlags() & LI_FF_PEN_TOUCH_EVENTS) && !m_LocalOverlayActive)) {
         return;
     }
 
@@ -214,6 +218,20 @@ void WinPointerBridge::handlePenInfo(const POINTER_PEN_INFO& penInfo, UINT messa
     }
 
     const bool isContact = (penInfo.pointerInfo.pointerFlags & POINTER_FLAG_INCONTACT) != 0;
+    const uint8_t eventType = eventTypeFor(penInfo, message);
+    const int clientWidth = clientRect.right - clientRect.left;
+    const int clientHeight = clientRect.bottom - clientRect.top;
+    if (m_LocalPointerCallback && clientWidth > 0 && clientHeight > 0 &&
+            m_LocalPointerCallback(m_GestureContext, eventType,
+                                   std::clamp(clientPoint.x / static_cast<float>(clientWidth), 0.0f, 1.0f),
+                                   std::clamp(clientPoint.y / static_cast<float>(clientHeight), 0.0f, 1.0f),
+                                   isContact)) {
+        m_PenInRange = eventType != LI_TOUCH_EVENT_HOVER_LEAVE;
+        m_PenInContact = isContact && eventType != LI_TOUCH_EVENT_UP;
+        m_LastButtons = 0;
+        updateCursorVisibility(m_PenInRange, m_PenInContact);
+        return;
+    }
     // Ignore a new contact outside the video rectangle, but keep an existing
     // stroke clamped if it crosses a letterbox or window boundary.
     const bool clamp = m_PenInContact;
@@ -240,7 +258,6 @@ void WinPointerBridge::handlePenInfo(const POINTER_PEN_INFO& penInfo, UINT messa
         return;
     }
 
-    const uint8_t eventType = eventTypeFor(penInfo, message);
     uint8_t toolType = LI_TOOL_TYPE_PEN;
     if (penInfo.penFlags & (PEN_FLAG_ERASER | PEN_FLAG_INVERTED)) {
         toolType = LI_TOOL_TYPE_ERASER;
@@ -328,13 +345,19 @@ void WinPointerBridge::updateCursorVisibility(bool penInRange, bool penInContact
     // Windows UI, then gets it out of the way while a pen-aware application is
     // drawing its own cursor during contact. The explicit hide-in-range policy
     // retains the old behaviour for users who never want the local cursor shown.
-    const bool shouldHide = PenCursorVisibility::shouldHide(
+    const bool shouldHide = !m_LocalOverlayActive && PenCursorVisibility::shouldHide(
         m_CursorPolicy, penInRange, penInContact);
     if (shouldHide == m_CursorHiddenForPen) {
         return;
     }
     SDL_ShowCursor(shouldHide ? 0 : 1);
     m_CursorHiddenForPen = shouldHide;
+}
+
+void WinPointerBridge::setLocalOverlayActive(bool active)
+{
+    m_LocalOverlayActive = active;
+    updateCursorVisibility(m_PenInRange, m_PenInContact);
 }
 
 bool WinPointerBridge::isPenPromotedMouseMessage()

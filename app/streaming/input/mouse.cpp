@@ -10,6 +10,7 @@
 
 void SdlInputHandler::handleMouseButtonEvent(SDL_MouseButtonEvent* event)
 {
+    if (handleProfileSelectorMouseButton(event)) return;
     int button;
 
     if (event->which == SDL_TOUCH_MOUSEID) {
@@ -79,6 +80,7 @@ void SdlInputHandler::handleMouseButtonEvent(SDL_MouseButtonEvent* event)
 
 void SdlInputHandler::handleMouseMotionEvent(SDL_MouseMotionEvent* event)
 {
+    if (handleProfileSelectorMouseMotion(event)) return;
     if (!isCaptureActive()) {
         // Not capturing
         return;
@@ -173,6 +175,7 @@ void SdlInputHandler::handleMouseMotionEvent(SDL_MouseMotionEvent* event)
 
 void SdlInputHandler::handleMouseWheelEvent(SDL_MouseWheelEvent* event)
 {
+    if (handleProfileSelectorMouseWheel(event)) return;
     if (!isCaptureActive()) {
         // Not capturing
         return;

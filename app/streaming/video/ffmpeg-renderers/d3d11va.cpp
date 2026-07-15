@@ -1176,6 +1176,10 @@ bool D3D11VARenderer::createOverlayVertexBuffer(Overlay::OverlayType type, int w
         renderRect.x = 0;
         renderRect.y = m_DisplayHeight - height;
     }
+    else if (type == Overlay::OverlayQuickKeyProfiles) {
+        renderRect.x = (m_DisplayWidth - width) / 2.0f;
+        renderRect.y = (m_DisplayHeight - height) / 2.0f;
+    }
 
     renderRect.w = width;
     renderRect.h = height;

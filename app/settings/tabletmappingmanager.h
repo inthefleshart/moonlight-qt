@@ -33,6 +33,9 @@ enum class TabletLocalAction
     CycleTouchPolicy,
     ToggleDiagnostics,
     ResetStuckInput,
+    OpenProfileSelector,
+    NextFavoriteProfile,
+    PreviousFavoriteProfile,
 };
 
 enum TabletMouseButton
@@ -85,6 +88,9 @@ class TabletMappingManager : public QAbstractListModel
     Q_PROPERTY(QAbstractItemModel* bindingsModel READ bindingsModel CONSTANT)
     Q_PROPERTY(bool duplicateBindings READ duplicateBindings NOTIFY bindingsChanged)
     Q_PROPERTY(QVariantList actionOptions READ actionOptions CONSTANT)
+    Q_PROPERTY(QVariantList favoriteProfileOptions READ favoriteProfileOptions
+               NOTIFY favoriteProfilesChanged)
+    Q_PROPERTY(int favoriteProfileCount READ favoriteProfileCount NOTIFY favoriteProfilesChanged)
 
 public:
     static constexpr int SlotCount = 10;
@@ -108,11 +114,14 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     QStringList profiles() const;
+    QStringList favoriteProfiles() const;
     QString activeProfile() const;
     void setActiveProfile(const QString& profile);
     QAbstractItemModel* bindingsModel() { return this; }
     bool duplicateBindings() const;
     QVariantList actionOptions() const;
+    QVariantList favoriteProfileOptions() const;
+    int favoriteProfileCount() const { return m_FavoriteProfileIds.size(); }
 
     Q_INVOKABLE QString binding(int slot) const;
     Q_INVOKABLE QString sourceBinding(int slot) const;
@@ -129,6 +138,11 @@ public:
     Q_INVOKABLE void clearBinding(int slot);
     Q_INVOKABLE void resetBinding(int slot);
     Q_INVOKABLE void resetActiveProfile();
+    Q_INVOKABLE bool setProfileFavorite(const QString& profile, bool favorite);
+    Q_INVOKABLE bool moveFavoriteProfile(const QString& profile, int direction);
+    Q_INVOKABLE void resetFavoriteProfiles();
+    Q_INVOKABLE QString cycleFavoriteProfile(int direction);
+    Q_INVOKABLE bool isFavoriteProfile(const QString& profile) const;
     Q_INVOKABLE bool isValidBinding(const QString& sequence) const;
 
     TabletControlAction actionForSlot(int slot) const;
@@ -141,6 +155,7 @@ public:
 signals:
     void activeProfileChanged();
     void bindingsChanged();
+    void favoriteProfilesChanged();
 
 private:
     explicit TabletMappingManager(QObject* parent = nullptr);
@@ -148,7 +163,10 @@ private:
     void buildShippedProfiles();
     void loadActiveProfile();
     void migrateLegacySettings();
+    void loadFavoriteProfiles();
+    void storeFavoriteProfiles();
     QString profileIdForName(const QString& name) const;
+    QString profileNameForId(const QString& id) const;
     QString actionSettingsKey(int slot) const;
     QString sourceSettingsKey(int slot) const;
     TabletControlAction shippedAction(int slot) const;
@@ -169,6 +187,7 @@ private:
     QStringList m_ProfileOrder;
     QHash<QString, QString> m_ProfileIds;
     QHash<QString, QVector<TabletControlAction>> m_ShippedProfiles;
+    QStringList m_FavoriteProfileIds;
     QVector<TabletControlAction> m_Actions;
     QVector<TabletSourceShortcut> m_Sources;
 };

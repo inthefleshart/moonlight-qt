@@ -14,7 +14,7 @@ namespace {
 Q_GLOBAL_STATIC(QReadWriteLock, s_TabletMappingLock)
 TabletMappingManager* s_TabletMappingManager = nullptr;
 
-constexpr int kSettingsSchema = 2;
+constexpr int kSettingsSchema = 3;
 
 QJsonObject strokeToJson(const TabletKeyStroke& stroke)
 {
@@ -33,13 +33,13 @@ TabletKeyStroke strokeFromJson(const QJsonObject& object)
     return stroke;
 }
 
-QByteArray actionToJson(const TabletControlAction& action)
+QByteArray actionToJson(const TabletControlAction& action, int schema = kSettingsSchema)
 {
     QJsonArray sequence;
     for (const auto& stroke : action.sequence) {
         sequence.append(strokeToJson(stroke));
     }
-    QJsonObject object{{"schema", kSettingsSchema},
+    QJsonObject object{{"schema", schema},
                        {"kind", static_cast<int>(action.kind)},
                        {"activation", static_cast<int>(action.activation)},
                        {"name", action.name},
@@ -61,9 +61,10 @@ TabletControlAction actionFromJson(const QByteArray& json, bool* ok)
         return action;
     }
     const auto object = document.object();
+    const int schema = object.value("schema").toInt();
     const int kind = object.value("kind").toInt(-1);
     const int activation = object.value("activation").toInt(-1);
-    if (object.value("schema").toInt() != kSettingsSchema ||
+    if ((schema != 2 && schema != kSettingsSchema) ||
             kind < static_cast<int>(TabletActionKind::Disabled) ||
             kind > static_cast<int>(TabletActionKind::WacomRadialChord) ||
             activation < static_cast<int>(TabletActivation::Tap) ||
@@ -86,9 +87,12 @@ TabletControlAction actionFromJson(const QByteArray& json, bool* ok)
                                     static_cast<int>(TabletMouseNone),
                                     static_cast<int>(TabletMouseX2));
     action.wheelDelta = std::clamp(object.value("wheelDelta").toInt(), -1200, 1200);
+    const int maximumLocalAction = schema == 2 ?
+        static_cast<int>(TabletLocalAction::ResetStuckInput) :
+        static_cast<int>(TabletLocalAction::PreviousFavoriteProfile);
     action.localAction = static_cast<TabletLocalAction>(std::clamp(
         object.value("localAction").toInt(), static_cast<int>(TabletLocalAction::None),
-        static_cast<int>(TabletLocalAction::ResetStuckInput)));
+        maximumLocalAction));
     action.modified = true;
     *ok = action.valid() || action.kind == TabletActionKind::Disabled;
     return action;
@@ -179,7 +183,8 @@ TabletMappingManager::TabletMappingManager(QObject* parent)
     migrateLegacySettings();
 
     QSettings settings;
-    m_ActiveProfile = settings.value("tabletMappings/v2/activeProfile", "Default").toString();
+    m_ActiveProfile = profileNameForId(
+        settings.value("tabletMappings/v3/activeProfileId", "default").toString());
     if (!m_ProfileOrder.contains(m_ActiveProfile)) m_ActiveProfile = "Default";
 
     for (int slot = 0; slot < SlotCount; ++slot) {
@@ -193,6 +198,7 @@ TabletMappingManager::TabletMappingManager(QObject* parent)
             m_Sources[slot] = {stroke, true};
         }
     }
+    loadFavoriteProfiles();
     loadActiveProfile();
 }
 
@@ -238,6 +244,15 @@ QHash<int, QByteArray> TabletMappingManager::roleNames() const
 }
 
 QStringList TabletMappingManager::profiles() const { return m_ProfileOrder; }
+QStringList TabletMappingManager::favoriteProfiles() const
+{
+    QStringList result;
+    for (const QString& id : m_FavoriteProfileIds) {
+        const QString profile = profileNameForId(id);
+        if (!profile.isEmpty()) result.append(profile);
+    }
+    return result;
+}
 QString TabletMappingManager::activeProfile() const { return m_ActiveProfile; }
 
 void TabletMappingManager::setActiveProfile(const QString& profile)
@@ -245,11 +260,83 @@ void TabletMappingManager::setActiveProfile(const QString& profile)
     if (!m_ProfileOrder.contains(profile) || profile == m_ActiveProfile) return;
     beginResetModel();
     m_ActiveProfile = profile;
-    QSettings().setValue("tabletMappings/v2/activeProfile", profile);
+    QSettings().setValue("tabletMappings/v3/activeProfileId", profileIdForName(profile));
     loadActiveProfile();
     endResetModel();
     emit activeProfileChanged();
     emit bindingsChanged();
+}
+
+QVariantList TabletMappingManager::favoriteProfileOptions() const
+{
+    QVariantList result;
+    QSet<QString> added;
+    for (int order = 0; order < m_FavoriteProfileIds.size(); ++order) {
+        const QString profile = profileNameForId(m_FavoriteProfileIds[order]);
+        if (profile.isEmpty()) continue;
+        result.append(QVariantMap{{"name", profile}, {"favorite", true}, {"order", order}});
+        added.insert(profile);
+    }
+    for (const QString& profile : m_ProfileOrder) {
+        if (!added.contains(profile))
+            result.append(QVariantMap{{"name", profile}, {"favorite", false}, {"order", -1}});
+    }
+    return result;
+}
+
+bool TabletMappingManager::isFavoriteProfile(const QString& profile) const
+{
+    return m_FavoriteProfileIds.contains(profileIdForName(profile));
+}
+
+bool TabletMappingManager::setProfileFavorite(const QString& profile, bool favorite)
+{
+    if (!m_ProfileOrder.contains(profile)) return false;
+    const QString id = profileIdForName(profile);
+    const int existing = m_FavoriteProfileIds.indexOf(id);
+    if (favorite && existing < 0) m_FavoriteProfileIds.append(id);
+    else if (!favorite && existing >= 0) {
+        if (m_FavoriteProfileIds.size() == 1) return false;
+        m_FavoriteProfileIds.removeAt(existing);
+    } else return true;
+    storeFavoriteProfiles();
+    emit favoriteProfilesChanged();
+    return true;
+}
+
+bool TabletMappingManager::moveFavoriteProfile(const QString& profile, int direction)
+{
+    const int current = m_FavoriteProfileIds.indexOf(profileIdForName(profile));
+    if (current < 0 || direction == 0) return false;
+    const int destination = std::clamp(current + (direction < 0 ? -1 : 1),
+                                       0, static_cast<int>(m_FavoriteProfileIds.size()) - 1);
+    if (destination == current) return false;
+    m_FavoriteProfileIds.move(current, destination);
+    storeFavoriteProfiles();
+    emit favoriteProfilesChanged();
+    return true;
+}
+
+void TabletMappingManager::resetFavoriteProfiles()
+{
+    m_FavoriteProfileIds.clear();
+    for (const QString& profile : m_ProfileOrder) m_FavoriteProfileIds.append(profileIdForName(profile));
+    storeFavoriteProfiles();
+    emit favoriteProfilesChanged();
+}
+
+QString TabletMappingManager::cycleFavoriteProfile(int direction)
+{
+    if (m_FavoriteProfileIds.isEmpty() || direction == 0) return m_ActiveProfile;
+    const QString activeId = profileIdForName(m_ActiveProfile);
+    const int current = m_FavoriteProfileIds.indexOf(activeId);
+    int destination;
+    if (current < 0) destination = direction > 0 ? 0 : m_FavoriteProfileIds.size() - 1;
+    else destination = (current + (direction > 0 ? 1 : -1) + m_FavoriteProfileIds.size()) %
+                       m_FavoriteProfileIds.size();
+    const QString profile = profileNameForId(m_FavoriteProfileIds[destination]);
+    if (!profile.isEmpty()) setActiveProfile(profile);
+    return m_ActiveProfile;
 }
 
 QString TabletMappingManager::binding(int slot) const
@@ -341,6 +428,9 @@ bool TabletMappingManager::setActionOption(int slot, const QString& id)
     else if (id == "cycleTouch") action = local("Cycle touch policy", TabletLocalAction::CycleTouchPolicy);
     else if (id == "diagnostics") action = local("Toggle diagnostics", TabletLocalAction::ToggleDiagnostics);
     else if (id == "reset") action = local("Reset stuck input", TabletLocalAction::ResetStuckInput);
+    else if (id == "profileSelector") action = local("Open QuickKey preset selector", TabletLocalAction::OpenProfileSelector);
+    else if (id == "nextProfile") action = local("Next favorite QuickKey preset", TabletLocalAction::NextFavoriteProfile);
+    else if (id == "previousProfile") action = local("Previous favorite QuickKey preset", TabletLocalAction::PreviousFavoriteProfile);
     else if (id == "explorer") action = chord("File Explorer", "Meta+E");
     else if (id == "win10Action") action = chord("Windows 10 Action Center", "Meta+A");
     else if (id == "win11Quick") action = chord("Windows 11 Quick Settings", "Meta+A");
@@ -422,7 +512,7 @@ void TabletMappingManager::resetBinding(int slot)
 void TabletMappingManager::resetActiveProfile()
 {
     QSettings settings;
-    settings.remove(QString("tabletMappings/v2/profiles/%1").arg(profileIdForName(m_ActiveProfile)));
+    settings.remove(QString("tabletMappings/v3/profiles/%1").arg(profileIdForName(m_ActiveProfile)));
     beginResetModel();
     loadActiveProfile();
     endResetModel();
@@ -460,6 +550,9 @@ QVariantList TabletMappingManager::actionOptions() const
         {"disabled", "Unassigned"}, {"pass", "Pass through"},
         {"touch", "Touch forwarding on/off"}, {"cycleTouch", "Cycle touch policy"},
         {"diagnostics", "Toggle diagnostics"}, {"reset", "Reset stuck input"},
+        {"profileSelector", "Open QuickKey preset selector"},
+        {"nextProfile", "Next favorite QuickKey preset"},
+        {"previousProfile", "Previous favorite QuickKey preset"},
         {"middleGesture", "Middle-click pen gesture"}, {"rightGesture", "Right-click pen gesture"},
         {"explorer", "File Explorer"}, {"win10Action", "Windows 10 Action Center"},
         {"win11Quick", "Windows 11 Quick Settings"},
@@ -786,24 +879,72 @@ void TabletMappingManager::loadActiveProfile()
 void TabletMappingManager::migrateLegacySettings()
 {
     QSettings settings;
-    if (settings.value("tabletMappings/schema", 1).toInt() >= kSettingsSchema) return;
-    const QStringList legacyProfiles = {"Default", "Krita", "Photoshop", "Substance 3D Painter"};
-    for (const auto& profile : legacyProfiles) {
-        for (int slot = 0; slot < SlotCount; ++slot) {
-            const QString oldKey = QString("tabletMappings/profiles/%1/slot%2").arg(profile).arg(slot + 1);
-            const QString value = settings.value(oldKey).toString();
-            if (value.isEmpty()) continue;
-            settings.setValue(QString("tabletMappings/migrationBackup/v1/%1/slot%2")
-                                  .arg(profile).arg(slot + 1), value);
-            const auto action = chord(value, value);
-            if (action.valid()) {
-                const QString id = m_ProfileIds.value(profile, "default");
-                settings.setValue(QString("tabletMappings/v2/profiles/%1/slot%2")
-                                      .arg(id).arg(slot + 1), actionToJson(action));
+    const int existingSchema = settings.value("tabletMappings/schema", 1).toInt();
+    if (existingSchema < 2) {
+        const QStringList legacyProfiles = {"Default", "Krita", "Photoshop", "Substance 3D Painter"};
+        for (const auto& profile : legacyProfiles) {
+            for (int slot = 0; slot < SlotCount; ++slot) {
+                const QString oldKey = QString("tabletMappings/profiles/%1/slot%2").arg(profile).arg(slot + 1);
+                const QString value = settings.value(oldKey).toString();
+                if (value.isEmpty()) continue;
+                settings.setValue(QString("tabletMappings/migrationBackup/v1/%1/slot%2")
+                                      .arg(profile).arg(slot + 1), value);
+                const auto action = chord(value, value);
+                if (action.valid()) {
+                    const QString id = m_ProfileIds.value(profile, "default");
+                    settings.setValue(QString("tabletMappings/v2/profiles/%1/slot%2")
+                                          .arg(id).arg(slot + 1), actionToJson(action, 2));
+                }
             }
         }
     }
+
+    if (!settings.value("tabletMappings/v3/migrated", false).toBool()) {
+        const QString oldActive = settings.value("tabletMappings/v2/activeProfile", "Default").toString();
+        settings.setValue("tabletMappings/v3/activeProfileId", profileIdForName(oldActive));
+        for (int slot = 0; slot < SlotCount; ++slot) {
+            const QString oldSource = QString("tabletMappings/v2/sources/slot%1").arg(slot + 1);
+            if (settings.contains(oldSource))
+                settings.setValue(QString("tabletMappings/v3/sources/slot%1").arg(slot + 1),
+                                  settings.value(oldSource));
+        }
+        for (const QString& profile : m_ProfileOrder) {
+            const QString id = profileIdForName(profile);
+            for (int slot = 0; slot < SlotCount; ++slot) {
+                const QString oldKey = QString("tabletMappings/v2/profiles/%1/slot%2")
+                    .arg(id).arg(slot + 1);
+                const QByteArray oldJson = settings.value(oldKey).toByteArray();
+                if (oldJson.isEmpty()) continue;
+                bool ok = false;
+                const auto action = actionFromJson(oldJson, &ok);
+                if (ok) settings.setValue(QString("tabletMappings/v3/profiles/%1/slot%2")
+                                              .arg(id).arg(slot + 1), actionToJson(action));
+            }
+        }
+        QStringList allIds;
+        for (const QString& profile : m_ProfileOrder) allIds.append(profileIdForName(profile));
+        settings.setValue("tabletMappings/v3/favoriteProfileIds", allIds);
+        settings.setValue("tabletMappings/v3/migrated", true);
+    }
     settings.setValue("tabletMappings/schema", kSettingsSchema);
+}
+
+void TabletMappingManager::loadFavoriteProfiles()
+{
+    const QStringList configured = QSettings().value("tabletMappings/v3/favoriteProfileIds").toStringList();
+    QSet<QString> seen;
+    for (const QString& id : configured) {
+        if (!profileNameForId(id).isEmpty() && !seen.contains(id)) {
+            m_FavoriteProfileIds.append(id);
+            seen.insert(id);
+        }
+    }
+    if (m_FavoriteProfileIds.isEmpty()) resetFavoriteProfiles();
+}
+
+void TabletMappingManager::storeFavoriteProfiles()
+{
+    QSettings().setValue("tabletMappings/v3/favoriteProfileIds", m_FavoriteProfileIds);
 }
 
 QString TabletMappingManager::profileIdForName(const QString& name) const
@@ -811,15 +952,23 @@ QString TabletMappingManager::profileIdForName(const QString& name) const
     return m_ProfileIds.value(name, "default");
 }
 
+QString TabletMappingManager::profileNameForId(const QString& id) const
+{
+    for (auto it = m_ProfileIds.cbegin(); it != m_ProfileIds.cend(); ++it) {
+        if (it.value() == id) return it.key();
+    }
+    return {};
+}
+
 QString TabletMappingManager::actionSettingsKey(int slot) const
 {
-    return QString("tabletMappings/v2/profiles/%1/slot%2")
+    return QString("tabletMappings/v3/profiles/%1/slot%2")
         .arg(profileIdForName(m_ActiveProfile)).arg(slot + 1);
 }
 
 QString TabletMappingManager::sourceSettingsKey(int slot) const
 {
-    return QString("tabletMappings/v2/sources/slot%1").arg(slot + 1);
+    return QString("tabletMappings/v3/sources/slot%1").arg(slot + 1);
 }
 
 TabletControlAction TabletMappingManager::shippedAction(int slot) const

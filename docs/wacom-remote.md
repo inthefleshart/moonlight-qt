@@ -29,6 +29,18 @@ The pen-gesture editor combines optional Ctrl, Alt, Shift, Win, B, F, M, or Spac
 
 Preset switching updates all ten rows immediately. Presets are listed alphabetically. **Default** provides Undo, Redo, Save, Cut, Copy, Paste, File Explorer, task switching, On-Screen Keyboard, and Show Desktop. **Blank / Pass-Through** forwards F1–F10 unchanged. Customized rows display **Custom** and are not overwritten by later preset changes. **Reset** restores one shipped row; **Reset QuickKey profile** restores all ten.
 
+## Switching presets while streaming
+
+Press **Ctrl+Alt+Shift+P** during an active stream to open the local QuickKey preset selector. The shortcut is handled by Moonlight Artist and is not sent to the host.
+
+- Use the pen, touch, mouse, arrow keys, mouse wheel, controller D-pad, or Page Up/Page Down to highlight a preset.
+- Tap/click a row, press Enter, or press controller A to apply it immediately.
+- Press Escape, controller B, or tap outside the panel to cancel.
+- A star marks presets included in the Next/Previous favorite rotation.
+- Moonlight releases held remote pen, touch, mouse, QuickKey, keyboard, and controller input before changing profiles.
+
+Use **In-stream favorites…** in Input Settings to enable and reorder the profiles used by **Next favorite QuickKey preset** and **Previous favorite QuickKey preset**. The selector itself always lists every preset alphabetically. The common-action chooser can assign the selector and both cycle actions to any physical QuickKey; no shipped mapping is replaced automatically.
+
 ## Shipped profiles
 
 Application presets:
@@ -77,6 +89,8 @@ The chooser includes:
 - Touch-policy cycling
 - Diagnostics toggle
 - Reset stuck input
+- Open QuickKey preset selector
+- Next and previous favorite QuickKey preset
 - Middle- and right-click pen gestures
 - File Explorer (`Win+E`)
 - Windows 10 Action Center (`Win+A`)

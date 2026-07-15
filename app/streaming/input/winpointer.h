@@ -14,9 +14,12 @@ class WinPointerBridge
 public:
     using GestureCallback = bool (*)(void* context, uint8_t eventType, float x, float y,
                                      bool inContact);
+    using LocalPointerCallback = bool (*)(void* context, uint8_t eventType, float x, float y,
+                                          bool inContact);
 
     WinPointerBridge(int streamWidth, int streamHeight, bool diagnosticsEnabled,
-                     int cursorPolicy, void* gestureContext, GestureCallback gestureCallback);
+                     int cursorPolicy, void* gestureContext, GestureCallback gestureCallback,
+                     LocalPointerCallback localPointerCallback);
     ~WinPointerBridge();
 
     void setWindow(HWND window);
@@ -27,6 +30,7 @@ public:
     bool consumePromotedMouseMotion();
     bool consumePromotedMouseButton();
     void setDiagnosticsEnabled(bool enabled) { m_DiagnosticsEnabled = enabled; }
+    void setLocalOverlayActive(bool active);
 
 private:
     static void SDLCALL messageHook(void* userdata, void* hwnd, unsigned int message,
@@ -44,6 +48,7 @@ private:
     bool m_DiagnosticsEnabled;
     int m_CursorPolicy;
     bool m_CursorHiddenForPen;
+    bool m_LocalOverlayActive;
     bool m_PenInRange;
     bool m_PenInContact;
     uint8_t m_LastButtons;
@@ -58,6 +63,7 @@ private:
     uint32_t m_PromotedMouseButtonCount;
     void* m_GestureContext;
     GestureCallback m_GestureCallback;
+    LocalPointerCallback m_LocalPointerCallback;
 };
 
 #endif

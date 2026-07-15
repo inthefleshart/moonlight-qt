@@ -205,7 +205,7 @@ pwsh -File .\scripts\build-windows.ps1 -Configuration Release
 pwsh -File .\scripts\package-windows.ps1 -Configuration Release -SkipBuild
 ```
 
-The packaging command prints SHA-256 checksums for `MoonlightArtistPortable-x64-<version>.zip` and the separate `MoonlightPenDiagnostics.exe` host utility.
+The packaging command prints SHA-256 checksums for `MoonlightArtistPortable-x64-<upstream-version>-<artist-version>.zip` and the separate `MoonlightPenDiagnostics.exe` host utility. Artist release identifiers are stored in `app/artist-version.txt` so upstream's base version remains visible.
 
 Portable builds skip the WiX/MSI restore by default. Add `-BuildInstaller` only when an MSI is explicitly required and WiX 7/NuGet have been configured. Use `-Clean` for a from-scratch build; without it, the wrapper resumes incrementally.
 
@@ -259,6 +259,12 @@ For a fresh Moonlight Artist settings profile, the defaults are:
 Existing saved choices are preserved. Extract to a new folder or clear the portable settings file only when a fresh default profile is intentionally required.
 
 Open **Settings → Input Settings** and review the following fork-specific controls.
+
+### In-stream QuickKey preset selector
+
+Press **Ctrl+Alt+Shift+P** while connected to open a client-side preset selector. It consumes its own pen, touch, mouse, keyboard, QuickKey, and controller input so selection gestures are never sent to the host. Choose a row with a single tap/click, Enter, or controller A; Escape, controller B, or an outside tap cancels.
+
+The **In-stream favorites…** editor controls the ordered rotation used by the assignable **Next favorite QuickKey preset** and **Previous favorite QuickKey preset** actions. The selector always shows all profiles alphabetically. Existing QuickKey customizations are preserved, and no shipped slot is assigned to these actions automatically.
 
 ### Use native Windows pen input
 
