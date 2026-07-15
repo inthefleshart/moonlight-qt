@@ -1531,7 +1531,7 @@ Flickable {
                     id: inputDiagnosticsCheck
                     hoverEnabled: true
                     width: parent.width
-                    text: qsTr("Enable privacy-safe pen diagnostics")
+                    text: qsTr("Enable local pen diagnostics (memory-only)")
                     font.pointSize: 12
                     checked: StreamingPreferences.inputDiagnostics
                     onCheckedChanged: StreamingPreferences.inputDiagnostics = checked
@@ -1539,7 +1539,14 @@ Flickable {
                     ToolTip.delay: 1000
                     ToolTip.timeout: 10000
                     ToolTip.visible: hovered
-                    ToolTip.text: qsTr("Reports only aggregate pen sample and drop counts. It never records typed keys, application names, network addresses, file paths, or device serial numbers.")
+                    ToolTip.text: qsTr("Shows aggregate pen sample, timing, and drop counters locally for troubleshooting. Nothing is uploaded or sent to another service.")
+                }
+
+                Label {
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    opacity: 0.8
+                    text: qsTr("Optional troubleshooting only. Diagnostics stay in memory on this device, are not collected or transmitted, and never include typed keys, application names, network addresses, file paths, or device serial numbers. Leave this off during normal use.")
                 }
 
                 Label {

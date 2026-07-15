@@ -78,7 +78,7 @@ Profiles are available for:
 - Maya, 3ds Max, Blender, and Marmoset Toolbag
 - Windows 10/11 Remote, Maya-style navigation, 3ds Max-style navigation, sculpting, and texture-painting templates
 
-The ten default sources are F1–F10 and can be relearned individually. Presets are copied into editable working profiles and updates never overwrite customized rows. Modifier-only holds are supported. Pen gestures can hold keyboard modifiers and left, middle, right, X1, or X2 mouse while the pen supplies absolute movement, enabling actions such as Alt+Middle Mouse+Pen Drag.
+Profiles are listed alphabetically. **Default** contains common Windows shortcuts; **Blank / Pass-Through** forwards F1–F10 unchanged. The ten default sources are F1–F10 and can be relearned individually. Presets are copied into editable working profiles and updates never overwrite customized rows. Modifier-only holds are supported. Pen gestures can hold keyboard modifiers and left, middle, right, X1, or X2 mouse while the pen supplies absolute movement, enabling actions such as Alt+Middle Mouse+Pen Drag.
 
 Arbitrary text, shell commands, scripts, executable paths, and application launching are intentionally unsupported.
 
@@ -224,7 +224,7 @@ The exact Apollo labels may change between versions, so consult the host's curre
 1. Open the Apollo host configuration.
 2. Enable its existing native pen and touch input support.
 3. Disable USB-over-network forwarding for the integrated digitizer during initial tests.
-4. Select one physical or virtual display for initial diagnostics.
+4. Launch Apollo's **Virtual Display** entry, or enable **Always use Virtual Display** for the selected application.
 5. Start with HEVC, SDR, 2560×1440, 60 FPS.
 6. Match the client display and host display aspect ratio.
 7. After pen mapping is correct, test 3840×2160 at 60 FPS.
@@ -241,7 +241,22 @@ The exact Apollo labels may change between versions, so consult the host's curre
 
 Pairing, video, audio, mouse, keyboard, controller, and virtual-display behavior otherwise follow normal Moonlight/Apollo operation.
 
+On Windows, Moonlight Artist imports the installed official Moonlight client's certificate, private key, and unique client ID once when valid credentials are available. Apollo remembers virtual-display layout per fixed client identity, so this preserves the same virtual monitor selection while Artist keeps its own streaming, pen, and QuickKey preferences. The identity values stay in local settings and are never printed by diagnostics. If no installed official identity is available, Artist creates its own identity and must be paired/configured as a separate Apollo client.
+
 ## Moonlight configuration
+
+For a fresh Moonlight Artist settings profile, the defaults are:
+
+- Resolution: 2560×1440 (1440p)
+- Frame rate: 60 FPS
+- Video bitrate: 40 Mbps with automatic bitrate adjustment disabled
+- Optimize game settings for streaming: disabled
+- Quit app on host after ending the stream: enabled
+- Discord Rich Presence: disabled
+- Remote-desktop mouse mode: enabled
+- Capture system keyboard shortcuts: enabled in fullscreen
+
+Existing saved choices are preserved. Extract to a new folder or clear the portable settings file only when a fresh default profile is intentionally required.
 
 Open **Settings → Input Settings** and review the following fork-specific controls.
 
@@ -257,9 +272,9 @@ Open **Settings → Input Settings** and review the following fork-specific cont
 
 Start with **Windows default**. Select **Disable touch while pen is in range** only if palm contacts are forwarded while drawing. Use **Always forward touch** when simultaneous pen hover and deliberate touch input are required and the driver handles palm rejection reliably.
 
-### Enable privacy-safe pen diagnostics
+### Enable local pen diagnostics (memory-only)
 
-When enabled, Moonlight reports aggregate native-pen sample, history-depth, retained/truncated sample, duplicate-suppression, and processing-time counters. It does not record typed keys, application titles, network addresses, file paths, or device serial numbers.
+This is optional troubleshooting and is not required for normal pen input. When enabled, Moonlight displays aggregate native-pen sample, history-depth, retained/truncated sample, duplicate-suppression, and processing-time counters locally. Nothing is collected, uploaded, or sent to another service. It does not record typed keys, application titles, network addresses, file paths, or device serial numbers.
 
 For a visual pressure graph and drawable test canvas, run the separately packaged `MoonlightPenDiagnostics.exe` on the host before connecting. It stores no logs and exposes an explicit clear/reset button. Leave diagnostics off during normal use.
 

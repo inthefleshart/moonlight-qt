@@ -32,8 +32,14 @@ ComboBox {
         }
     }
 
-    // We call this every time the options change (and init)
-    // so we can adjust the combo box width here too
+    // Models declared inline may finish populating after the ComboBox itself.
+    // Recalculate on the next event-loop turn and whenever the model count changes
+    // so the initial width already fits the longest option.
+    Component.onCompleted: Qt.callLater(recalculateWidth)
+    onCountChanged: Qt.callLater(recalculateWidth)
+    onModelChanged: Qt.callLater(recalculateWidth)
+
+    // Recalculate after user selection too, in case a dynamic model changed.
     onActivated: recalculateWidth()
 
     popup.onAboutToShow: {

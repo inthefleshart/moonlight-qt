@@ -11,6 +11,7 @@
 #include <QFont>
 #include <QCursor>
 #include <QElapsedTimer>
+#include <QFileInfo>
 #include <QTemporaryFile>
 #include <QRegularExpression>
 
@@ -433,10 +434,11 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationDomain("moonlight-stream.com");
     QCoreApplication::setApplicationName("Moonlight Artist");
 
-    if (QFile(QDir::currentPath() + "/portable.dat").exists()) {
+    const QString executableDir = QFileInfo(QString::fromLocal8Bit(argv[0])).absolutePath();
+    if (QFile(QDir(executableDir).filePath("portable.dat")).exists()) {
         QSettings::setDefaultFormat(QSettings::IniFormat);
-        QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, QDir::currentPath());
-        QSettings::setPath(QSettings::IniFormat, QSettings::SystemScope, QDir::currentPath());
+        QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, executableDir);
+        QSettings::setPath(QSettings::IniFormat, QSettings::SystemScope, executableDir);
 
         // Initialize paths for portable mode
         Path::initialize(true);

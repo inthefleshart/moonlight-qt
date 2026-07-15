@@ -1,6 +1,7 @@
 #include "identitymanager.h"
 #include "utils.h"
 
+#include <QCoreApplication>
 #include <QDebug>
 
 #include <openssl/pem.h>
@@ -11,6 +12,44 @@
 #define SER_UNIQUEID "uniqueid"
 #define SER_CERT "certificate"
 #define SER_KEY "key"
+#define SER_ARTIST_IDENTITY_MIGRATION "moonlightArtist/identityMigrationVersion"
+
+namespace {
+void importOfficialMoonlightIdentity(QSettings& artistSettings)
+{
+#ifdef Q_OS_WIN32
+    constexpr int MigrationVersion = 1;
+    if (QCoreApplication::applicationName() != QStringLiteral("Moonlight Artist") ||
+            artistSettings.value(SER_ARTIST_IDENTITY_MIGRATION, 0).toInt() >= MigrationVersion) {
+        return;
+    }
+
+    // Apollo remembers virtual-display layout per fixed Moonlight client identity.
+    // Reuse the installed official client's identity while leaving every other
+    // Moonlight Artist preference in its separate settings namespace.
+    QSettings officialSettings(QSettings::NativeFormat, QSettings::UserScope,
+                               QCoreApplication::organizationName(), QStringLiteral("Moonlight"));
+    const QByteArray certificate = officialSettings.value(SER_CERT).toByteArray();
+    const QByteArray privateKey = officialSettings.value(SER_KEY).toByteArray();
+    const QString uniqueId = officialSettings.value(SER_UNIQUEID).toString();
+
+    const QList<QSslCertificate> certificates = QSslCertificate::fromData(certificate, QSsl::Pem);
+    const QSslKey sslKey(privateKey, QSsl::Rsa, QSsl::Pem, QSsl::PrivateKey);
+    if (certificates.isEmpty() || sslKey.isNull() || uniqueId.isEmpty()) {
+        return;
+    }
+
+    artistSettings.setValue(SER_CERT, certificate);
+    artistSettings.setValue(SER_KEY, privateKey);
+    artistSettings.setValue(SER_UNIQUEID, uniqueId);
+    artistSettings.setValue(SER_ARTIST_IDENTITY_MIGRATION, MigrationVersion);
+    artistSettings.sync();
+    qInfo() << "Imported existing Moonlight client identity for Apollo display compatibility";
+#else
+    Q_UNUSED(artistSettings)
+#endif
+}
+}
 
 IdentityManager* IdentityManager::s_Im = nullptr;
 
@@ -109,6 +148,7 @@ void IdentityManager::createCredentials(QSettings& settings)
 IdentityManager::IdentityManager()
 {
     QSettings settings;
+    importOfficialMoonlightIdentity(settings);
 
     m_CachedPemCert = settings.value(SER_CERT).toByteArray();
     m_CachedPrivateKey = settings.value(SER_KEY).toByteArray();
@@ -137,7 +177,7 @@ IdentityManager::IdentityManager()
     // Load the unique ID from settings
     m_CachedUniqueId = settings.value(SER_UNIQUEID).toString();
     if (!m_CachedUniqueId.isEmpty()) {
-        qInfo() << "Loaded unique ID from settings:" << m_CachedUniqueId;
+        qInfo() << "Loaded unique ID from settings";
     }
     else {
         // Generate a new unique ID in base 16
@@ -145,7 +185,7 @@ IdentityManager::IdentityManager()
         RAND_bytes(reinterpret_cast<unsigned char*>(&uid), sizeof(uid));
         m_CachedUniqueId = QString::number(uid, 16);
 
-        qInfo() << "Generated new unique ID:" << m_CachedUniqueId;
+        qInfo() << "Generated new unique ID";
 
         settings.setValue(SER_UNIQUEID, m_CachedUniqueId);
     }

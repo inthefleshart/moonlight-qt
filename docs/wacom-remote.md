@@ -9,7 +9,7 @@ Open **Settings > Input Settings**:
 - **Use native Windows pen input**: keep enabled for a Windows Pointer API pen display.
 - **Pen cursor visibility**: use **Automatic** initially. It hides only Moonlight's local system cursor while the pen is in range; the remote application's brush cursor remains visible.
 - **Pen and touch interaction**: begin with **Windows default**. Use pen-priority only if unwanted palm contacts reach the host.
-- **Privacy-safe pen diagnostics**: enable temporarily to collect aggregate batch, retained-sample, truncation, and processing-time counters. Typed keys and machine identifiers are never recorded.
+- **Local pen diagnostics (memory-only)**: optional troubleshooting only. Aggregate batch, retained-sample, truncation, and processing-time counters stay on the client and are never uploaded or sent to another service. Typed keys and machine identifiers are never recorded.
 
 Restart an active stream after changing native-pen settings.
 
@@ -27,7 +27,7 @@ The shortcut recorder requires no typed syntax. Escape cancels and Backspace cle
 
 The pen-gesture editor combines optional Ctrl, Alt, Shift, Win, B, F, M, or Space input with left, middle, right, X1, or X2 mouse and absolute pen movement. This supports Alt+Middle Mouse+Pen Drag, B+Middle Mouse+Pen Drag, and similar viewport or brush controls. Mouse buttons are released before modifiers on contact end, QuickKey release, focus loss, capture loss, profile change, disconnect, or shutdown.
 
-Preset switching updates all ten rows immediately. Customized rows display **Custom** and are not overwritten by later preset changes. **Reset** restores one shipped row; **Reset QuickKey profile** restores all ten.
+Preset switching updates all ten rows immediately. Presets are listed alphabetically. **Default** provides Undo, Redo, Save, Cut, Copy, Paste, File Explorer, task switching, On-Screen Keyboard, and Show Desktop. **Blank / Pass-Through** forwards F1–F10 unchanged. Customized rows display **Custom** and are not overwritten by later preset changes. **Reset** restores one shipped row; **Reset QuickKey profile** restores all ten.
 
 ## Shipped profiles
 
@@ -49,6 +49,7 @@ Application presets:
 Generic presets:
 
 - Blank / Pass-Through
+- Default
 - Windows 10 Remote
 - Windows 11 Remote
 - Maya-Style 3D Navigation
@@ -95,7 +96,11 @@ Configure a unique chord for Radial Menu in Wacom Center or the host's Wacom con
 
 ## Apollo host setup
 
-Enable native pen and touch input. Start with one virtual display at 2560×1440, 60 Hz, HEVC, and SDR. Match the virtual-display and client aspect ratios. After mapping and pressure pass, test 3840×2160 at 60 Hz. Disable USB-over-network forwarding for the integrated digitizer.
+Enable native pen and touch input. Launch Apollo's **Virtual Display** entry, or enable **Always use Virtual Display** for the selected application. Start with one virtual display at 2560×1440, 60 Hz, HEVC, and SDR. Match the virtual-display and client aspect ratios. After mapping and pressure pass, test 3840×2160 at 60 Hz. Disable USB-over-network forwarding for the integrated digitizer.
+
+Apollo remembers virtual-display configuration per fixed client identity. On Windows, Moonlight Artist imports a valid installed official Moonlight identity once while keeping its other settings separate. This lets Apollo reuse the same remembered virtual-monitor layout. Identity values remain local and are never logged. If no installed identity is available, pair Artist separately and review that client's Apollo permissions and display configuration.
+
+Fresh Moonlight Artist profiles default to 2560×1440 at 60 FPS and 40 Mbps, game optimization off, quit-after-stream on, Discord Rich Presence off, remote-desktop mouse mode on, and system-shortcut capture in fullscreen. Existing saved preferences are not overwritten.
 
 Application settings:
 

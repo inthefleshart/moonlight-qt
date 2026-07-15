@@ -641,7 +641,11 @@ void TabletMappingManager::buildShippedProfiles()
         m_ShippedProfiles.insert(name, profile);
     };
 
-    add("Default", "default", {});
+    add("Default", "default", {chord("Undo", "Ctrl+Z"), chord("Redo", "Ctrl+Y"),
+        chord("Save", "Ctrl+S"), chord("Cut", "Ctrl+X"), chord("Copy", "Ctrl+C"),
+        chord("Paste", "Ctrl+V"), chord("File Explorer", "Meta+E"),
+        chord("Next application", "Alt+Tab"), chord("On-Screen Keyboard", "Meta+Ctrl+O"),
+        chord("Show desktop", "Meta+D")});
     add("Blank / Pass-Through", "blank", {});
     add("Krita", "krita", {chord("Undo", "Ctrl+Z"), chord("Redo", "Ctrl+Shift+Z"),
         chord("Save", "Ctrl+S"), chord("Freehand Brush", "B"), chord("Eraser", "E"),
@@ -750,7 +754,7 @@ void TabletMappingManager::buildShippedProfiles()
         gesture("Pan", "Alt", TabletMouseMiddle), gesture("Zoom", "Alt", TabletMouseRight),
         chord("Frame", "F"), local("Toggle diagnostics", TabletLocalAction::ToggleDiagnostics)});
 
-    for (const QString& name : {QStringLiteral("Default"), QStringLiteral("Blank / Pass-Through")}) {
+    for (const QString& name : {QStringLiteral("Blank / Pass-Through")}) {
         QVector<TabletControlAction> passThrough(SlotCount);
         for (auto& action : passThrough) {
             action.kind = TabletActionKind::PassThrough;
@@ -758,6 +762,8 @@ void TabletMappingManager::buildShippedProfiles()
         }
         m_ShippedProfiles[name] = passThrough;
     }
+
+    m_ProfileOrder.sort(Qt::CaseInsensitive);
 }
 
 void TabletMappingManager::loadActiveProfile()

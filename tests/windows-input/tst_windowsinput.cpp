@@ -121,6 +121,9 @@ void WindowsInputTests::shippedProfilesExposeTenControls()
     for (const auto& profile : requiredProfiles) {
         QVERIFY2(manager->profiles().contains(profile), qPrintable(profile));
     }
+    QStringList sortedProfiles = manager->profiles();
+    sortedProfiles.sort(Qt::CaseInsensitive);
+    QCOMPARE(manager->profiles(), sortedProfiles);
 
     for (const auto& profile : manager->profiles()) {
         manager->setActiveProfile(profile);
@@ -128,6 +131,15 @@ void WindowsInputTests::shippedProfilesExposeTenControls()
         for (int slot = 0; slot < TabletMappingManager::SlotCount; ++slot) {
             QVERIFY2(manager->actionForSlot(slot).valid(), qPrintable(profile));
         }
+    }
+
+    manager->setActiveProfile("Default");
+    QCOMPARE(manager->actionForSlot(0).kind, TabletActionKind::KeyChord);
+    QCOMPARE(manager->actionForSlot(0).name, QString("Undo"));
+    QCOMPARE(manager->actionForSlot(9).name, QString("Show desktop"));
+    manager->setActiveProfile("Blank / Pass-Through");
+    for (int slot = 0; slot < TabletMappingManager::SlotCount; ++slot) {
+        QCOMPARE(manager->actionForSlot(slot).kind, TabletActionKind::PassThrough);
     }
 
     manager->setActiveProfile("ZBrush — Right-Click Navigation");

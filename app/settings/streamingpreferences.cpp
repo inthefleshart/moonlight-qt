@@ -125,20 +125,20 @@ void StreamingPreferences::reload()
     }
 #endif
 
-    width = settings.value(SER_WIDTH, 1280).toInt();
-    height = settings.value(SER_HEIGHT, 720).toInt();
+    width = settings.value(SER_WIDTH, 2560).toInt();
+    height = settings.value(SER_HEIGHT, 1440).toInt();
     fps = settings.value(SER_FPS, 60).toInt();
     enableYUV444 = settings.value(SER_YUV444, false).toBool();
-    bitrateKbps = settings.value(SER_BITRATE, getDefaultBitrate(width, height, fps, enableYUV444)).toInt();
+    bitrateKbps = settings.value(SER_BITRATE, 40000).toInt();
     unlockBitrate = settings.value(SER_UNLOCK_BITRATE, false).toBool();
-    autoAdjustBitrate = settings.value(SER_AUTOADJUSTBITRATE, true).toBool();
+    autoAdjustBitrate = settings.value(SER_AUTOADJUSTBITRATE, false).toBool();
     enableVsync = settings.value(SER_VSYNC, true).toBool();
-    gameOptimizations = settings.value(SER_GAMEOPTS, true).toBool();
+    gameOptimizations = settings.value(SER_GAMEOPTS, false).toBool();
     playAudioOnHost = settings.value(SER_HOSTAUDIO, false).toBool();
     multiController = settings.value(SER_MULTICONT, true).toBool();
     enableMdns = settings.value(SER_MDNS, true).toBool();
-    quitAppAfter = settings.value(SER_QUITAPPAFTER, false).toBool();
-    absoluteMouseMode = settings.value(SER_ABSMOUSEMODE, false).toBool();
+    quitAppAfter = settings.value(SER_QUITAPPAFTER, true).toBool();
+    absoluteMouseMode = settings.value(SER_ABSMOUSEMODE, true).toBool();
     absoluteTouchMode = settings.value(SER_ABSTOUCHMODE, true).toBool();
 #ifdef Q_OS_WIN32
     nativePenInput = settings.value(SER_NATIVEPENINPUT, true).toBool();
@@ -159,7 +159,7 @@ void StreamingPreferences::reload()
     framePacing = settings.value(SER_FRAMEPACING, false).toBool();
     connectionWarnings = settings.value(SER_CONNWARNINGS, true).toBool();
     configurationWarnings = settings.value(SER_CONFWARNINGS, true).toBool();
-    richPresence = settings.value(SER_RICHPRESENCE, true).toBool();
+    richPresence = settings.value(SER_RICHPRESENCE, false).toBool();
     gamepadMouse = settings.value(SER_GAMEPADMOUSE, true).toBool();
     detectNetworkBlocking = settings.value(SER_DETECTNETBLOCKING, true).toBool();
     showPerformanceOverlay = settings.value(SER_SHOWPERFOVERLAY, false).toBool();
@@ -172,7 +172,7 @@ void StreamingPreferences::reload()
     keepAwake = settings.value(SER_KEEPAWAKE, true).toBool();
     enableHdr = settings.value(SER_HDR, false).toBool();
     captureSysKeysMode = static_cast<CaptureSysKeysMode>(settings.value(SER_CAPTURESYSKEYS,
-                                                         static_cast<int>(CaptureSysKeysMode::CSK_OFF)).toInt());
+                                                         static_cast<int>(CaptureSysKeysMode::CSK_FULLSCREEN)).toInt());
     audioConfig = static_cast<AudioConfig>(settings.value(SER_AUDIOCFG,
                                                   static_cast<int>(AudioConfig::AC_STEREO)).toInt());
     videoCodecConfig = static_cast<VideoCodecConfig>(settings.value(SER_VIDEOCFG,
