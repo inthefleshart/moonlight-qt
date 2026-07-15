@@ -6,6 +6,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+if ($Configuration -ne 'Release') {
+    throw 'Debug builds use non-redistributable Microsoft debug runtimes and cannot be packaged. Build and package Release instead.'
+}
 if (-not $SkipBuild) {
     & (Join-Path $PSScriptRoot 'build-windows.ps1') -Configuration $Configuration
     if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
@@ -15,6 +18,8 @@ $configName = $Configuration.ToLowerInvariant()
 $source = Get-ChildItem (Join-Path $root "build\installer-x64-$configName\MoonlightArtistPortable-*.zip") |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (-not $source) { throw 'Portable package was not produced.' }
+
+& (Join-Path $PSScriptRoot 'verify-windows-package.ps1') -PackagePath $source.FullName
 
 $artifactDir = Join-Path $root 'artifacts'
 New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null

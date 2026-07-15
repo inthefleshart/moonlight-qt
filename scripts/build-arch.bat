@@ -147,11 +147,13 @@ for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -find VC\Redist\MSVC\*\%ARC
 
 echo Cleaning output directories
 if defined MOONLIGHT_CLEAN (
-    rmdir /s /q %DEPLOY_FOLDER%
     rmdir /s /q %BUILD_FOLDER%
     rmdir /s /q %INSTALLER_FOLDER%
     rmdir /s /q %SYMBOLS_FOLDER%
 )
+rem Deployment folders are disposable. Always recreate them so renamed binaries,
+rem release/debug Qt plugins, and other stale files cannot enter a new package.
+if exist %DEPLOY_FOLDER% rmdir /s /q %DEPLOY_FOLDER%
 if not exist %BUILD_ROOT% mkdir %BUILD_ROOT%
 if not exist %DEPLOY_FOLDER% mkdir %DEPLOY_FOLDER%
 if not exist %BUILD_FOLDER% mkdir %BUILD_FOLDER%
@@ -209,6 +211,15 @@ if "%ML_SYMBOL_ARCHIVE%" NEQ "" (
         echo "A symbol archive directory must be specified in ML_SYMBOL_ARCHIVE for signed release builds"
         exit /b 1
     )
+)
+
+rem Debug builds are for local validation only. They depend on the non-
+rem redistributable Visual C++ debug runtime and must never be presented as a
+rem portable package. Remove any obsolete debug archives created by older scripts.
+if /I "%BUILD_CONFIG%"=="debug" (
+    if exist %INSTALLER_FOLDER%\MoonlightArtistPortable-*.zip del /q %INSTALLER_FOLDER%\MoonlightArtistPortable-*.zip
+    echo Debug build successful. Portable packaging is intentionally disabled for Debug builds.
+    exit /b 0
 )
 
 echo Copying DLL dependencies
@@ -304,7 +315,12 @@ if defined CI_VERSION (
     if !ERRORLEVEL! NEQ 0 goto Error
 )
 
-7z a %INSTALLER_FOLDER%\MoonlightArtistPortable-%ARCH%-%VERSION%-%ARTIST_VERSION%.zip %DEPLOY_FOLDER%\*
+set PORTABLE_PACKAGE=%INSTALLER_FOLDER%\MoonlightArtistPortable-%ARCH%-%VERSION%-%ARTIST_VERSION%.zip
+if exist %PORTABLE_PACKAGE% del /q %PORTABLE_PACKAGE%
+7z a %PORTABLE_PACKAGE% %DEPLOY_FOLDER%\*
+if !ERRORLEVEL! NEQ 0 goto Error
+
+powershell -NoProfile -ExecutionPolicy Bypass -File %SOURCE_ROOT%\scripts\verify-windows-package.ps1 -PackagePath %PORTABLE_PACKAGE%
 if !ERRORLEVEL! NEQ 0 goto Error
 
 echo Build successful for Moonlight v%VERSION% %ARCH% binaries!

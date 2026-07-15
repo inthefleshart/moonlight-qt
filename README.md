@@ -209,6 +209,8 @@ The packaging command prints SHA-256 checksums for `MoonlightArtistPortable-x64-
 
 Portable builds skip the WiX/MSI restore by default. Add `-BuildInstaller` only when an MSI is explicitly required and WiX 7/NuGet have been configured. Use `-Clean` for a from-scratch build; without it, the wrapper resumes incrementally.
 
+Only Release builds produce portable ZIPs. Debug builds are compile/test artifacts that require Microsoft's non-redistributable debug runtime, so the build scripts deliberately refuse to package them. Every Release ZIP is checked for a single `MoonlightArtist.exe`, required release runtime files, forbidden diagnostic artifacts, and accidental debug-runtime imports before it is copied to `artifacts\`.
+
 For a Debug build:
 
 ```powershell
